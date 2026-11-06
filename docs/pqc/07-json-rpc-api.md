@@ -81,7 +81,7 @@ transactions with these differences:
 | `publicKey` | **new**: hex of the carried public key; absent when nothing is carried | absent |
 | `signature` | **new**: hex of the whole signature | absent |
 | `v`, `r`, `s`, `yParity` | absent | unchanged |
-| `from` | `keccak256(resolved public key)[12:]` | unchanged |
+| `from` | `keccak256(resolved public key)[-20:]` | unchanged |
 
 Example of a `FLEXIBLE_EIP1559` transaction signed with `SECP256K1-MLDSA44` (values shortened):
 

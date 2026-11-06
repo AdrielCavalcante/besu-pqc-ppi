@@ -45,19 +45,20 @@ enode://<128 hex characters>@172.20.0.2:30303     ← SECP256K1 / SECP256R1
   must therefore use full-length enodes.
 - Bootnodes from a built-in network definition that do not parse are ignored with a warning. Bootnodes given on the
   command line fail at start-up.
-- A peer's address, as seen by consensus, is `keccak256(nodeId)[12:]`, which is the same as the validator address.
+- A peer's address, as seen by consensus, is `keccak256(nodeId)[-20:]`, which is the same as the validator address.
 
 ## Discovery v4 packets
 
 ```
 upstream:  hash(32) | signature(65)                  | type(1) | RLP data
-fork:      hash(32) | signature(sigLen of node DSA)  | partial public key | type(1) | RLP data
+fork:      hash(32) | signature(sigLen of node DSA)  | (publicKey) | type(1) | RLP data
 ```
 
-- **Partial public key.** For a hybrid, this is the post-quantum half (1312 bytes for ML-DSA-44). The receiver recovers
-  the ECDSA half from the first 65 bytes of the signature, rebuilds the full node ID and verifies the post-quantum half.
-  The packet hash covers the key bytes. See `Packet`, `PacketFactory` and `PacketSerializer` in
-  `ethereum/p2p/.../discovery/internal/`.
+- **Public key.** Only a hybrid node writes a key here, and only its non-recoverable half (e.g. 1312 bytes for
+  ML-DSA-44). The receiver recovers the recoverable half from the signature (e.g. the first 65 bytes for ECDSA),
+  rebuilds the full node ID and verifies the non-recoverable half. A recoverable node DSA (e.g. `SECP256K1`) writes
+  nothing, as upstream. The packet hash covers the key bytes. See `Packet`, `PacketFactory` and `PacketSerializer` in
+  `ethereum/p2p/.../discovery/discv4/internal/packet/`.
 - **Packet size.** `MAX_PACKET_SIZE_BYTES` is raised from 1280 to **8192** bytes (`PeerDiscoveryAgentV4`). Packets larger
   than the path MTU are fragmented at the IP level, which some NATs and firewalls drop. Prefer flat networks or static
   peers for hybrid nodes behind NAT.
@@ -80,8 +81,11 @@ The fork adds the scheme **`vnt`**:
 
 ## Discovery v5
 
-Discovery v5 can decode and verify `vnt` records (`VerifyingVntInterpreter`, `BootnodeRecordFactory`). The discv5
-session handshake itself still signs with the **ECDSA half** of the node key (`LocalNodeKeySigner`). Discovery v5 is
+> ⚠️ **Discovery v5 is not recommended with this fork.** Its messages are not signed with the node DSA.
+
+Discovery v5 can decode and verify `vnt` records (`VerifyingVntInterpreter`, `BootnodeRecordFactory`), but the discv5
+session handshake still signs with the **ECDSA half** of the node key (`LocalNodeKeySigner`). A hybrid node is
+therefore authenticated only classically on discv5. Use discovery v4 or static peers instead. Discovery v5 is
 experimental in upstream Besu as well.
 
 ## RLPx transport

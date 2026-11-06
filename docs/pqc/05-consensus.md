@@ -26,10 +26,10 @@ public key must travel with the signature and the signature must be verified exp
 | Node DSA | QBFT | IBFT 2.0 | Clique | IBFT 1.0 (legacy) | Usable on a real network |
 |---|---|---|---|---|---|
 | `SECP256K1` | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `SECP256R1` | ✓ | ✓ | ✓ | — | ✓ (`ecCurve: secp256r1`) |
-| `SECP256K1-MLDSA44` | ✓ | ✓ | ✓ | — | ✓ |
-| `SECP256K1-FALCON512` | ✓ | ✓ | ✓ | — | ⚠ experimental: static peers, discovery off ([why](06-networking.md#falcon-node-keys)) |
-| `MLDSA44`, `FALCON512` | ✓ (tests) | ✓ (tests) | ✓ (tests) | — | — (no RLPx key agreement, see [Key management](03-cryptography/key-management.md#key-agreement-ecdh)) |
+| `SECP256R1` | ✓ | ✓ | ✓ | ✗ | ✓ (`ecCurve: secp256r1`) |
+| `SECP256K1-MLDSA44` | ✓ | ✓ | ✓ | ✗ | ✓ |
+| `SECP256K1-FALCON512` | ✓ | ✓ | ✓ | ✗ | ⚠ experimental: static peers, discovery off ([why](06-networking.md#falcon-node-keys)) |
+| `MLDSA44`, `FALCON512` | ✓ (tests) | ✓ (tests) | ✓ (tests) | ✗ | ✗ (no RLPx key agreement, see [Key management](03-cryptography/key-management.md#key-agreement-ecdh)) |
 
 The consensus layer itself is algorithm-agnostic: `MLDSA65` and `MLDSA87` use the same code paths, although the
 consensus tests do not cover them. In this table, "tests" means consensus tests with mocked peers.
@@ -42,7 +42,7 @@ For every signed consensus object, the fork:
 2. writes the signer's public key **only if the node DSA cannot recover it**. For a hybrid, only the post-quantum half
    is written, following [the public-key encoding rules](03-cryptography/key-management.md#public-key-encoding-rules);
 3. on receipt, resolves the key (recovering what can be recovered), **verifies** the signature if the DSA is not
-   recoverable, and derives the author as `keccak256(publicKey)[12:]`.
+   recoverable, and derives the author as `keccak256(publicKey)[-20:]`.
 
 With `SECP256K1` or `SECP256R1`, nothing extra is written, and all encodings are **byte-identical to upstream**.
 
@@ -73,6 +73,9 @@ seals (non-recoverable DSA)  = [ seal₁, key₁, seal₂, key₂, … ]
 
 - `CommitSeal` pairs a seal with its optional public key. `BftExtraDataCodec` writes each key immediately after its seal,
   in the same flat list.
+- A hybrid uses the non-recoverable layout, but `keyᵢ` holds only the part of the key that cannot be recovered: the half
+  of a non-recoverable algorithm when the other half is recoverable, or the whole key when neither is. The recoverable
+  half is recovered from the seal when it is decoded.
 - Seals are not covered by the block hash (`encodeWithoutCommitSeals`), so carrying keys does not change block hashes.
 - `CommitSeal.recoverVerifiedAuthor` verifies each seal against its key. A seal that fails is **discarded** with
   `Discarding commit seal that failed verification against its supplied public key.`, and the block is valid only if
@@ -114,15 +117,18 @@ non-recoverable DSA:  vanity(32) | validators(20·n) | key(K) | seal(S) | K(2) |
 
 Consensus authenticates the *proposer* and the *committers*. It does not authenticate each transaction. The fork
 therefore also re-verifies transaction signatures while processing every block (see
-[Transactions → Validation](04-transactions.md#where-signatures-are-checked)). Successful verifications are cached by
+[Transactions → Validation](04-transactions.md#where-transaction-signatures-are-checked)). Successful verifications are cached by
 transaction hash, so a validator that already verified a transaction at pool admission does not pay for it again
 during proposal validation or block import.
 
 ## Network-wide requirements
 
-> ⚠️ **Every node of a network must use the same `--node-dsa` from genesis onwards.** The format of messages, seals and
-> `extraData` follows the node DSA, and there is no hard-fork activation to switch algorithms on a running chain. A node
-> with a different DSA cannot decode its peers' messages, and its enode would be rejected.
+> ⚠️ **Every node of a network must use the same `--node-dsa`, chosen when the network is created and kept for the
+> life of the chain.** The format of consensus messages, commit seals and `extraData` follows the node DSA, and there is
+> no hard-fork activation to switch algorithms on a running chain. A node with a different DSA cannot decode its peers'
+> messages, and its peers reject its identity, because its discovery packets and node record (ENR) use a different
+> format. Enode URLs configured with a key of the wrong length (bootnodes, static nodes, allowlists) are also rejected
+> when the configuration is parsed (see [Networking](06-networking.md)).
 
 ## Tests
 
