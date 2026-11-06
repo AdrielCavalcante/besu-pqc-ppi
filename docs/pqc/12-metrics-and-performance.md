@@ -126,7 +126,7 @@ All algorithms are measured in the same run, so load on the machine mostly cance
 ## Performance design
 
 Measures taken so that post-quantum verification can run on every node and at every stage (see
-[Transactions → Validation](04-transactions.md#where-signatures-are-checked)):
+[Transactions → Validation](04-transactions.md#where-transaction-signatures-are-checked)):
 
 | Measure | Effect |
 |---|---|

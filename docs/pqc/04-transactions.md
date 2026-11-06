@@ -8,7 +8,6 @@ Ethereum transactions do not say which algorithm signed them. Everything assumes
 `(v, r, s)` and the sender is recovered from it. The fork adds **flexible transactions**, which are algorithm-agnostic: they drop `v`, `r` and `s` altogether, name their DSA, carry a signature of any length and, when the DSA cannot recover
 the public key from the signature, carry the signer's public key.
 
-
 Standard transaction types (`0x00`–`0x04`) are unchanged and keep working.
 
 ## Contents
@@ -120,17 +119,19 @@ in `Transaction.java` (`flexibleEip1559Preimage`, `flexibleAccessListPreimage`, 
 ```mermaid
 flowchart TD
   T[Flexible transaction] --> D{dsaType}
-  D -->|recoverable<br/>SECP256K1/R1| R[Recover the key from the signature]
-  D -->|non-recoverable<br/>ML-DSA, Falcon| P[Take the carried publicKey]
-  D -->|hybrid| H["Recover the ECDSA half<br/>+ take the carried PQ half<br/>→ CompositePublicKey"]
-  R --> A["sender = keccak256(publicKey)[12:]"]
+  D -->|recoverable<br/>e.g. SECP256K1, SECP256R1| R["<b>publicKey</b> = key recovered<br/>from the signature"]
+  D -->|non-recoverable<br/>e.g. ML-DSA, Falcon| P["<b>publicKey</b> = key carried<br/>in the transaction"]
+  D -->|hybrid<br/>e.g. SECP256K1-MLDSA44| H["<b>publicKey</b> = firstKey ‖ secondKey<br/>(CompositePublicKey), each half<br/>resolved as its own algorithm's key"]
+  R --> A["sender = keccak256(<b>publicKey</b>)[-20:]"]
   P --> A
   H --> A
 ```
 
 - `PublicKeyHandler.resolvePublicKey` resolves the key, and `Transaction.getSender()` derives the address.
-- For a hybrid, the address is the hash of the **concatenated** key `ecdsaKey ‖ pqKey`. The address therefore commits
-  to both keys, and a hybrid account is a different account from the ECDSA-only account with the same ECDSA key.
+- For a hybrid, each half of the key is resolved the way its own algorithm's key is: recovered from the signature
+  when that algorithm allows it, carried in the transaction otherwise. The address is computed over the
+  **concatenated** key `firstKey ‖ secondKey`, in the order the hybrid names its algorithms. The address therefore
+  commits to both keys, and a hybrid account is a different account from the account of either key on its own.
 - Senders are cached by transaction hash. `Transaction.resolvableSender()` returns an empty result instead of throwing
   when the key cannot be resolved, so such a transaction is rejected with `INVALID_SIGNATURE` instead of causing an
   internal error.
@@ -150,13 +151,14 @@ has two kinds:
 - Both kinds can be mixed in one `authorizationList`, and both `0x04` and `0x44` transactions accept both kinds.
 - A flexible delegation signs `keccak256(0x05 ‖ 0x01 ‖ rlp([0x01, dsaType, chainId, address, nonce, (publicKey)]))`.
 - The `publicKey` rule is the same as for transactions.
-- The authority is `keccak256(resolvedPublicKey)[12:]`.
+- The authority is `keccak256(resolvedPublicKey)[-20:]`.
 
 > **Compatibility note:** changing the flexible delegation signing layout would invalidate every delegation already
 > signed. The layout is defined in `CodeDelegation.computeSenderRecoveryHash`.
 
 ## Validation
 
+Before validation, decoding rejects a `dsaType` that is not in the node's `--accounts-supported-dsas`. Then
 `MainnetTransactionValidator.validateTransactionSignature` checks every transaction, in this order:
 
 1. **Structure.** `signature.isValid(SignatureValidationContext)`:
@@ -167,9 +169,8 @@ has two kinds:
 2. **Sender.** The signer's key must be resolvable (see [Sender derivation](#sender-derivation)).
 3. **Signature.**
    - Recoverable DSAs need no further check, because recovery has already authenticated the signer.
-   - Every other DSA runs `dsa.verify(signingHash, signature, resolvedPublicKey)`. For a hybrid, both halves must verify.
-4. **DSA policy.** `dsaType` must be one of the node's `--accounts-supported-dsas`. This check runs earlier, while the
-   transaction is decoded.
+   - Every other DSA runs `dsa.verify(signingHash, signature, resolvedPublicKey)`. For a hybrid, a recoverable half is
+     authenticated by recovery (step 2), and a non-recoverable half by `verify`.
 
 Every failure is reported as `INVALID_SIGNATURE`. A DSA that is not enabled is rejected with:
 
@@ -178,10 +179,14 @@ DSA type MLDSA44 (0x0030) is not enabled for accounts on this node
 ```
 
 For code delegations, `validateCodeDelegation` verifies the signature against the **resolved** signer key. For a hybrid,
-that is the recovered ECDSA half plus the carried post-quantum half. Its errors include
-`Invalid code delegation signature` and `Code delegation signer key could not be resolved`.
+that is the composite key, each half recovered from the signature or carried in the delegation as its own algorithm
+allows. Its errors include `Invalid code delegation signature` and `Code delegation signer key could not be resolved`.
 
-### Where signatures are checked
+### Where transaction signatures are checked
+
+This covers transaction signatures only. The other signatures are checked where they are received: consensus messages,
+commit seals and Clique seals in [Consensus](05-consensus.md#bft-messages-qbft-and-ibft-20), discovery packets and node
+records in [Networking](06-networking.md#discovery-v4-packets).
 
 | Stage | Check |
 |---|---|
@@ -189,10 +194,11 @@ that is the recovered ECDSA half plus the carried post-quantum half. Its errors 
 | Block processing (proposal validation, import, sync) | signature validation again (`MainnetTransactionProcessor`) |
 
 Checking signatures during block processing is essential. Without it, a malicious block proposer could include a
-transaction that carries a victim's ML-DSA public key with an arbitrary signature, and peers would execute it as the
-victim. To keep this affordable, successful verifications are cached by transaction hash (up to 100 000 entries), so a
-transaction is verified once even though it passes through pool admission, block building, proposal validation and
-import. [Metrics and performance](12-metrics-and-performance.md) discusses the cost.
+transaction that carries a victim's public key for a non-recoverable algorithm (e.g. ML-DSA) with an arbitrary
+signature, and peers would execute it as the victim. To keep this affordable, successful verifications are cached by
+transaction hash (up to 100 000 entries), so a transaction is verified once even though it passes through pool
+admission, block building, proposal validation and import. [Metrics and performance](12-metrics-and-performance.md)
+discusses the cost.
 
 ## Hard-fork activation
 

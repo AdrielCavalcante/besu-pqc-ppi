@@ -119,8 +119,11 @@ could fill blocks with transactions that are cheap in gas but expensive to verif
 1. Use **`SECP256K1-MLDSA44`** as the node DSA for post-quantum networks.
 2. Enable the same `--accounts-supported-dsas` on every validator.
 3. Prefer hybrid account DSAs during the transition, and pure post-quantum DSAs where ECDSA tooling is not needed.
-4. Keep the network permissioned. Use static peers or a flat network, because discovery packets can exceed the usual
-   MTU.
+4. Keep the network permissioned. Use static peers or a flat network. With a post-quantum node DSA, discovery packets
+   usually exceed the usual MTU (about 1500 bytes) and are fragmented at the IP level. If the underlying network does
+   not allow UDP fragmentation (e.g. some NATs, firewalls and load balancers), the fragments are dropped, the packets
+   are lost and peers fail to discover each other (see
+   [Networking → Discovery v4 packets](06-networking.md#discovery-v4-packets)).
 5. Protect node key files (`chmod 600`), and back them up: hybrid keys cannot be regenerated from a mnemonic.
 
 ---
