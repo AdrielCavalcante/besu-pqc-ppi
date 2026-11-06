@@ -36,8 +36,18 @@ public class DsaNotEnabledException extends RuntimeException {
    * @param dsaId the DSA type asked for
    */
   public DsaNotEnabledException(final short dsaId) {
-    super("DSA type " + describe(dsaId) + " is not enabled for accounts on this node");
+    super(message(dsaId));
     this.dsaId = dsaId;
+  }
+
+  /**
+   * The message for a DSA type that is not enabled, for callers that report it without throwing.
+   *
+   * @param dsaId the DSA type asked for
+   * @return the message naming it
+   */
+  public static String message(final short dsaId) {
+    return "DSA type " + describe(dsaId) + " is not enabled for accounts on this node";
   }
 
   /**

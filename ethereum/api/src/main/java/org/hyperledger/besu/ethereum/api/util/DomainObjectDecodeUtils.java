@@ -14,7 +14,9 @@
  */
 package org.hyperledger.besu.ethereum.api.util;
 
+import org.hyperledger.besu.crypto.SignatureAlgorithmFactory;
 import org.hyperledger.besu.crypto.config.DsaNotEnabledException;
+import org.hyperledger.besu.crypto.providers.DSAProviderFactory;
 import org.hyperledger.besu.ethereum.api.jsonrpc.internal.exception.InvalidJsonRpcRequestException;
 import org.hyperledger.besu.ethereum.api.jsonrpc.internal.response.RpcErrorType;
 import org.hyperledger.besu.ethereum.core.Transaction;
@@ -30,7 +32,16 @@ public class DomainObjectDecodeUtils {
       throws InvalidJsonRpcRequestException {
     try {
       Bytes txnBytes = Bytes.fromHexString(rawTransaction);
-      return TransactionDecoder.decodeOpaqueBytes(txnBytes, EncodingContext.POOLED_TRANSACTION);
+      final Transaction transaction =
+          TransactionDecoder.decodeOpaqueBytes(txnBytes, EncodingContext.POOLED_TRANSACTION);
+      // A flexible type that is not enabled already failed decoding. The network's curve is not
+      // looked up there, so a standard signature made with it is refused here, the same way.
+      if (transaction.isSignedWithNetworkCurve()
+          && !DSAProviderFactory.getVerifierProvider().isNetworkCurveEnabled()) {
+        throw new DsaNotEnabledException(
+            SignatureAlgorithmFactory.getInstance().getDsaParametersSet().getId());
+      }
+      return transaction;
     } catch (final IllegalArgumentException e) {
       throw new InvalidJsonRpcRequestException(
           "Invalid raw transaction hex", RpcErrorType.INVALID_TRANSACTION_PARAMS, e);

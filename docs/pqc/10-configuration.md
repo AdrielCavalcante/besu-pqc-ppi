@@ -44,8 +44,9 @@ automatically (see [Key management](03-cryptography/key-management.md#node-keys-
 | Values | any name in [the algorithm registry](03-cryptography/algorithms.md#identifiers-and-sizes); case-insensitive |
 
 The algorithms that transactions and code delegations may use. Transactions with any other `dsaType` are rejected (see
-[Validation](04-transactions.md#validation)). Standard (non-flexible) transactions are always signed with the network
-curve and are not affected by this option. The node logs the list at start-up:
+[Validation](04-transactions.md#validation)). Standard (non-flexible) transactions and legacy code delegations are
+signed with the network curve, so they are rejected too when that curve (`SECP256K1`, or `SECP256R1` on a `secp256r1`
+network) is left out. The node logs the list at start-up:
 
 ```text
 Account-enabled DSAs: SECP256K1, SECP256R1, SECP256K1-MLDSA44, SECP256K1-FALCON512
@@ -155,10 +156,10 @@ besu operator generate-blockchain-config --config-file=qbftConfig.json --to=netw
 
 | Account DSA | Transaction types |
 |---|---|
-| network curve (`SECP256K1` or `SECP256R1`) | standard `0x00`–`0x04`, and flexible `0x41`–`0x44` with that `dsaType` if it is enabled |
+| network curve (`SECP256K1` or `SECP256R1`) | standard `0x00`–`0x04` and flexible `0x41`–`0x44` with that `dsaType`, if it is enabled |
 | any other enabled DSA | flexible `0x41`–`0x44` only |
 
-All nodes of a network must share the same `--node-dsa` and should share the same `--accounts-supported-dsas`.
+All nodes of a network must share the same `--node-dsa` and the same `--accounts-supported-dsas`.
 
 ## Start-up errors
 
