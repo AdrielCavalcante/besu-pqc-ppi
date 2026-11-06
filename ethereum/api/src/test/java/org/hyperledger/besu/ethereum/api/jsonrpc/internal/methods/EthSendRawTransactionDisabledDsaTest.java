@@ -21,6 +21,8 @@ import static org.mockito.Mockito.when;
 
 import org.hyperledger.besu.crypto.DigitalSignatureAlgorithm;
 import org.hyperledger.besu.crypto.KeyPair;
+import org.hyperledger.besu.crypto.SECP256R1;
+import org.hyperledger.besu.crypto.SignatureAlgorithmFactory;
 import org.hyperledger.besu.crypto.algorithms.parameters.DSAParametersSet;
 import org.hyperledger.besu.crypto.config.DigitalSignatureAlgorithmConfiguration;
 import org.hyperledger.besu.crypto.config.SupportedAlgorithms;
@@ -71,6 +73,7 @@ class EthSendRawTransactionDisabledDsaTest {
   @AfterEach
   void tearDown() {
     DSAProviderFactory.resetDsaProvider();
+    SignatureAlgorithmFactory.resetInstance();
   }
 
   @Test
@@ -108,6 +111,82 @@ class EthSendRawTransactionDisabledDsaTest {
     final JsonRpcResponse response = new EthSendRawTransaction(transactionPool).response(request);
 
     assertThat(response).isInstanceOf(JsonRpcSuccessResponse.class);
+  }
+
+  @Test
+  void aStandardTransactionIsRejectedNamingSecp256k1WhenItIsNotEnabled()
+      throws InvalidAlgorithmParameterException {
+    enableForAccounts(DSAParametersSet.MLDSA44);
+
+    assertRejectedNaming(
+        standardTransaction(SignatureAlgorithmFactory.getInstance().generateKeyPair()),
+        DSAParametersSet.SECP256K1);
+  }
+
+  @Test
+  void aStandardTransactionIsRejectedNamingSecp256r1WhenItIsNotEnabledOnASecp256r1Network()
+      throws InvalidAlgorithmParameterException {
+    SignatureAlgorithmFactory.resetInstance();
+    SignatureAlgorithmFactory.setInstance(new SECP256R1());
+    enableForAccounts(DSAParametersSet.SECP256K1, DSAParametersSet.MLDSA44);
+
+    assertRejectedNaming(
+        standardTransaction(SignatureAlgorithmFactory.getInstance().generateKeyPair()),
+        DSAParametersSet.SECP256R1);
+  }
+
+  @Test
+  void aStandardTransactionStillReachesThePoolWhenTheCurveIsEnabled()
+      throws InvalidAlgorithmParameterException {
+    enableForAccounts(DSAParametersSet.SECP256K1);
+    when(transactionPool.addTransactionViaApi(any(Transaction.class)))
+        .thenReturn(ValidationResult.valid());
+
+    final JsonRpcRequestContext request =
+        sendRawTransaction(
+            standardTransaction(SignatureAlgorithmFactory.getInstance().generateKeyPair())
+                .toHexString());
+    final JsonRpcResponse response = new EthSendRawTransaction(transactionPool).response(request);
+
+    assertThat(response).isInstanceOf(JsonRpcSuccessResponse.class);
+  }
+
+  /** The same error a flexible transaction of a type that is not enabled gets. */
+  private void assertRejectedNaming(final Bytes rawTransaction, final DSAParametersSet curve) {
+    final JsonRpcRequestContext request = sendRawTransaction(rawTransaction.toHexString());
+    final JsonRpcResponse response = new EthSendRawTransaction(transactionPool).response(request);
+
+    assertThat(response)
+        .usingRecursiveComparison()
+        .isEqualTo(
+            new JsonRpcErrorResponse(
+                request.getRequest().getId(),
+                new JsonRpcError(
+                    RpcErrorType.INVALID_TRANSACTION_PARAMS.getCode(),
+                    "DSA type "
+                        + curve.getName()
+                        + " (0x"
+                        + String.format("%04x", curve.getId())
+                        + ") is not enabled for accounts on this node",
+                    null)));
+    verifyNoInteractions(transactionPool);
+  }
+
+  /** An EIP-1559 transaction signed with the network's curve, in its pooled encoding. */
+  private static Bytes standardTransaction(final KeyPair signer) {
+    return TransactionEncoder.encodeOpaqueBytes(
+        Transaction.builder()
+            .type(TransactionType.EIP1559)
+            .chainId(CHAIN_ID)
+            .nonce(0)
+            .maxPriorityFeePerGas(Wei.of(1))
+            .maxFeePerGas(Wei.of(10))
+            .gasLimit(21_000)
+            .to(Address.fromHexString("0x000000000000000000000000000000000000beef"))
+            .value(Wei.of(1))
+            .payload(Bytes.EMPTY)
+            .signAndBuild(signer),
+        EncodingContext.POOLED_TRANSACTION);
   }
 
   private static void enableForAccounts(final DSAParametersSet... enabled)

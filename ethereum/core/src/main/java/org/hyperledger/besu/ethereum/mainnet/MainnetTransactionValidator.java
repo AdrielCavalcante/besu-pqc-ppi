@@ -294,13 +294,7 @@ public class MainnetTransactionValidator implements TransactionValidator {
    */
   private ValidationResult<TransactionInvalidReason> validateCurveEnabled(
       final Transaction transaction) {
-    final boolean signedWithCurve =
-        transaction.getDsaType().isEmpty()
-            || transaction
-                .getCodeDelegationList()
-                .map(delegations -> delegations.stream().anyMatch(d -> d.dsaType().isEmpty()))
-                .orElse(false);
-    if (!signedWithCurve || dsaProvider.isNetworkCurveEnabled()) {
+    if (!transaction.isSignedWithNetworkCurve() || dsaProvider.isNetworkCurveEnabled()) {
       return ValidationResult.valid();
     }
 
