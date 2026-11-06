@@ -65,15 +65,29 @@ public class MLDSA implements DigitalSignatureAlgorithm{
         return SignatureFactory.createSignatureFromBytes(Bytes.wrap(signature), mldsaParameters);
     }
 
+    /**
+     * Verifies a signature. A key of the wrong length is reported as a failed verification rather
+     * than an exception, as {@link Falcon#verify} does: BouncyCastle unpacks the key at fixed
+     * offsets and throws on any other length, and the key reaches here from untrusted transactions.
+     */
     @Override
     public Boolean verify(final Bytes data, final Signature signature, final PublicKey pk) {
-        MLDSAPublicKeyParameters pkParams = new MLDSAPublicKeyParameters(selectedBCParameter, pk.getEncoded());
+        final byte[] pkBytes = pk.getEncoded();
+        if (pkBytes == null || pkBytes.length != mldsaParameters.getPublicKeyLength()) {
+            return false;
+        }
+        MLDSAPublicKeyParameters pkParams = new MLDSAPublicKeyParameters(selectedBCParameter, pkBytes);
         // See sign: the signer is stateful, so it is never shared between calls.
         final MLDSASigner verifier = new MLDSASigner();
         verifier.init(false, pkParams);
         verifier.update(data.toArrayUnsafe(), 0, data.size());
 
-        return verifier.verifySignature(signature.encodedBytes().toArrayUnsafe());
+        try {
+            return verifier.verifySignature(signature.encodedBytes().toArrayUnsafe());
+        } catch (final RuntimeException e) {
+            LOG.debug("{} signature could not be verified: {}", mldsaParameters.getName(), e.getMessage());
+            return false;
+        }
     }
 
     @Override

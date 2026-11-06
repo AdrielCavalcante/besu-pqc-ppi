@@ -134,7 +134,8 @@ Entries of `authorizationList` (types `0x04` and `0x44`) are returned by `CodeDe
 | Situation | Code | Message |
 |---|---|---|
 | The DSA type is not enabled on the node | `-32602` | `DSA type MLDSA44 (0x0030) is not enabled for accounts on this node` |
-| Bad signature, signer cannot be resolved, wrong key length | `-32002` | `Invalid signature` |
+| Bad signature, signer cannot be resolved | `-32002` | `Invalid signature` |
+| `publicKey` of the wrong length for the `dsaType`, single or hybrid | `-32602` | `Invalid params` |
 | The type is not accepted by the active hard fork (e.g. Osaka) | `-32602` family | `Transaction type … is invalid, accepted transaction types are …` |
 
 For security reasons, the "not enabled" error does not list the enabled types. Use `vnt_getAccountsSupportedDSAs`.
