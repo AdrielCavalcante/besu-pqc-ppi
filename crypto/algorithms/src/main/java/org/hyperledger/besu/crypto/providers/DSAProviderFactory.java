@@ -10,6 +10,7 @@ import org.hyperledger.besu.crypto.config.DsaNotEnabledException;
 import org.hyperledger.besu.crypto.config.KeyConfiguration;
 
 public class DSAProviderFactory {
+  private static final VerifierProvider UNCONFIGURED_VERIFIER = new UnconfiguredVerifierProvider();
   private static DigitalSignatureAlgorithmProvider nodeDsaProvider;
 
   public static NodeKeyProvider getNodeKeyProvider(){
@@ -20,8 +21,14 @@ public class DSAProviderFactory {
     return nodeDsaProvider;
   }
 
+  /**
+   * Returns the configured verifier or, before {@link #setDsaProvider} is called, one that behaves
+   * as upstream Besu (see {@link UnconfiguredVerifierProvider}). Never returns null.
+   *
+   * @return the verifier provider
+   */
   public static VerifierProvider getVerifierProvider(){
-    return nodeDsaProvider;
+    return nodeDsaProvider != null ? nodeDsaProvider : UNCONFIGURED_VERIFIER;
   }
 
   public static void setDsaProvider(final DigitalSignatureAlgorithmConfiguration dsaConfig, final KeyConfiguration keyConfig) {

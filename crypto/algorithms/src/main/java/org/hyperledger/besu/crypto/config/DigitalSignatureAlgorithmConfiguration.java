@@ -82,6 +82,10 @@ public class DigitalSignatureAlgorithmConfiguration {
         return enabledDSA;
     }
 
+    public boolean isAccountEnabled(final Short dsaId) {
+        return accountsEnabledDSAs.containsKey(dsaId);
+    }
+
     public DigitalSignatureAlgorithm getSupportedDSA(final String dsaName){
         return supportedAlgorithms.getDSAByName(dsaName).get();
     }

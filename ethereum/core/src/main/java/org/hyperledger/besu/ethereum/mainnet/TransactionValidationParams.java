@@ -85,6 +85,18 @@ public interface TransactionValidationParams {
     return false;
   }
 
+  /**
+   * Whether the transaction is simulated rather than processed for real. A simulated transaction
+   * carries a fake signature, so it is not held to the algorithms accounts may sign with. {@link
+   * org.hyperledger.besu.ethereum.transaction.TransactionSimulator} sets it on whatever parameters
+   * it is given. Left out of {@code of(...)} so the positional constructors stay as they are.
+   */
+  @Value.Default
+  @Value.Parameter(false)
+  default boolean isSimulation() {
+    return false;
+  }
+
   static TransactionValidationParams transactionSimulator() {
     return transactionSimulatorParams;
   }

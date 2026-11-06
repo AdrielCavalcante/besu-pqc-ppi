@@ -71,6 +71,12 @@ public class DigitalSignatureAlgorithmProvider implements NodeKeyProvider, KeyMa
     }
 
     @Override
+    public boolean isNetworkCurveEnabled() {
+        return config.isAccountEnabled(
+            SignatureAlgorithmFactory.getInstance().getDsaParametersSet().getId());
+    }
+
+    @Override
     public DigitalSignatureAlgorithm getActiveDSA() {
         return config.getNodeActiveDSA();
     }
