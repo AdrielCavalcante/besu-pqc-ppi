@@ -182,6 +182,10 @@ For code delegations, `validateCodeDelegation` verifies the signature against th
 that is the composite key, each half recovered from the signature or carried in the delegation as its own algorithm
 allows. Its errors include `Invalid code delegation signature` and `Code delegation signer key could not be resolved`.
 
+Unlike [EIP-7702](https://eips.ethereum.org/EIPS/eip-7702), where an invalid authorization is skipped, a delegation
+whose DSA is not enabled invalidates the **whole transaction**, whatever its type. That includes a legacy delegation
+(no `dsaType`, signed with the network curve) when the network curve is left out of `--accounts-supported-dsas`.
+
 ### Where transaction signatures are checked
 
 This covers transaction signatures only. The other signatures are checked where they are received: consensus messages,

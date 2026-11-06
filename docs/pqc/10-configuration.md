@@ -159,7 +159,7 @@ besu operator generate-blockchain-config --config-file=qbftConfig.json --to=netw
 | network curve (`SECP256K1` or `SECP256R1`) | standard `0x00`–`0x04` and flexible `0x41`–`0x44` with that `dsaType`, if it is enabled |
 | any other enabled DSA | flexible `0x41`–`0x44` only |
 
-All nodes of a network must share the same `--node-dsa` and should share the same `--accounts-supported-dsas`.
+All nodes of a network must share the same `--node-dsa` and the same `--accounts-supported-dsas`.
 
 ## Start-up errors
 
