@@ -188,6 +188,8 @@ class PublicKeyHandlerTest {
             return null;
           }
         };
+    // The native library recovers without going through the override, where it is available.
+    noSigner.disableNative();
     final SECP256R1 signer = new SECP256R1();
     final Signature signature = signer.sign(HASH, signer.generateNodeKeyPair().getPrivateKey());
 

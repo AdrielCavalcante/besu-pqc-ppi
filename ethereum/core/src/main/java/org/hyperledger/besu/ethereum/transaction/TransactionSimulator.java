@@ -35,6 +35,7 @@ import org.hyperledger.besu.ethereum.core.MiningConfiguration;
 import org.hyperledger.besu.ethereum.core.MutableWorldState;
 import org.hyperledger.besu.ethereum.core.ProcessableBlockHeader;
 import org.hyperledger.besu.ethereum.core.Transaction;
+import org.hyperledger.besu.ethereum.mainnet.ImmutableTransactionValidationParams;
 import org.hyperledger.besu.ethereum.mainnet.MainnetTransactionProcessor;
 import org.hyperledger.besu.ethereum.mainnet.ProtocolSchedule;
 import org.hyperledger.besu.ethereum.mainnet.ProtocolSpec;
@@ -475,7 +476,10 @@ public class TransactionSimulator {
             miningBeneficiary,
             operationTracer,
             blockHashLookup,
-            transactionValidationParams,
+            ImmutableTransactionValidationParams.builder()
+                .from(transactionValidationParams)
+                .isSimulation(true)
+                .build(),
             blobGasPrice,
             accessLocationTracker);
 

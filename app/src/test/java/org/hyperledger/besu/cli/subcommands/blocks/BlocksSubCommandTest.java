@@ -226,7 +226,8 @@ public class BlocksSubCommandTest extends CommandTestAbstract {
         "--from",
         fileToImport.getAbsolutePath());
 
-    assertThat(DSAProviderFactory.getVerifierProvider()).isNotNull();
+    // the verifier is never null, so it would pass without any provider set up
+    assertThat(DSAProviderFactory.getNodeKeyProvider()).isNotNull();
     assertThat(commandErrorOutput.toString(UTF_8)).isEmpty();
   }
 

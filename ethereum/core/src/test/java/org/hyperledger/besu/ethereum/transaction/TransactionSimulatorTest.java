@@ -19,6 +19,7 @@ import static org.hyperledger.besu.ethereum.trie.pathbased.common.provider.World
 import static org.hyperledger.besu.evm.tracing.OperationTracer.NO_TRACING;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -258,6 +259,29 @@ public class TransactionSimulatorTest extends TrustedSetupClassLoaderExtension {
 
     assertThat(result.get().isSuccessful()).isTrue();
     verifyTransactionWasProcessed(expectedTransaction);
+  }
+
+  /** Whatever parameters it is given, what it processes carries a fake signature. */
+  @Test
+  public void shouldProcessAsASimulationWhateverTheParametersGiven() {
+    final CallParameter callParameter = legacyTransactionCallParameterBuilder().build();
+    mockBlockchainAndWorldState(callParameter);
+    mockProtocolSpecForProcessWithWorldUpdater();
+
+    uncappedTransactionSimulator.process(
+        callParameter, TransactionValidationParams.processingBlock(), NO_TRACING, 1L);
+
+    verify(transactionProcessor)
+        .processTransaction(
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            argThat(TransactionValidationParams::isSimulation),
+            any(Wei.class),
+            any());
   }
 
   @Test
