@@ -117,9 +117,9 @@ non-recoverable DSA:  vanity(32) | validators(20·n) | key(K) | seal(S) | K(2) |
 
 Consensus authenticates the *proposer* and the *committers*. It does not authenticate each transaction. The fork
 therefore also re-verifies transaction signatures while processing every block (see
-[Transactions → Validation](04-transactions.md#where-transaction-signatures-are-checked)). Successful verifications are cached by
-transaction hash, so a validator that already verified a transaction at pool admission does not pay for it again
-during proposal validation or block import.
+[Transactions → Validation](04-transactions.md#where-transaction-signatures-are-checked)). Successful verifications are
+cached by transaction hash, so a validator that already verified a transaction at pool admission does not pay for it
+again during proposal validation or block import.
 
 ## Network-wide requirements
 

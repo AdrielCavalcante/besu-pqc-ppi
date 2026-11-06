@@ -30,12 +30,12 @@ Standard transaction types (`0x00`–`0x04`) are unchanged and keep working.
 Defined in `datatypes/.../TransactionType.java`. Each flexible type mirrors a standard type: the low nibble matches,
 and the high nibble `0x4` marks the type as flexible.
 
-| Type                     | Byte   | Mirrors                  | Access list | EIP-1559 fees  | Blobs | Code delegation |
-| ------------------------ | ------ | ------------------------ | ----------- | -------------- | ----- | --------------- |
-| `FLEXIBLE_ACCESS_LIST`   | `0x41` | `ACCESS_LIST` (`0x01`)   | ✓           | — (`gasPrice`) | —     | —               |
-| `FLEXIBLE_EIP1559`       | `0x42` | `EIP1559` (`0x02`)       | ✓           | ✓              | —     | —               |
-| `FLEXIBLE_BLOB`          | `0x43` | `BLOB` (`0x03`)          | ✓           | ✓              | ✓     | —               |
-| `FLEXIBLE_DELEGATE_CODE` | `0x44` | `DELEGATE_CODE` (`0x04`) | ✓           | ✓              | —     | ✓               |
+| Type | Byte | Mirrors | Access list | EIP-1559 fees | Blobs | Code delegation |
+|---|---|---|---|---|---|---|
+| `FLEXIBLE_ACCESS_LIST` | `0x41` | `ACCESS_LIST` (`0x01`) | ✓ | — (`gasPrice`) | — | — |
+| `FLEXIBLE_EIP1559` | `0x42` | `EIP1559` (`0x02`) | ✓ | ✓ | — | — |
+| `FLEXIBLE_BLOB` | `0x43` | `BLOB` (`0x03`) | ✓ | ✓ | ✓ | — |
+| `FLEXIBLE_DELEGATE_CODE` | `0x44` | `DELEGATE_CODE` (`0x04`) | ✓ | ✓ | — | ✓ |
 
 There is no flexible counterpart of legacy (Frontier) transactions. A legacy transaction has no explicit `chainId` field:
 under EIP-155 the chain ID is calculated through `v`. Since flexible transactions have no `v`, `r` or `s`, a flexible legacy
@@ -53,12 +53,12 @@ Compared with the standard type, the field list changes in three ways:
 - `yParity, r, s` are replaced by one `signature` byte string.
 - An optional `publicKey` is added just before the signature.
 
-| Type   | RLP field list                                                                                                                                                        |
-| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `0x41` | `[dsaType, chainId, nonce, gasPrice, gasLimit, to, value, data, accessList, (publicKey), signature]`                                                                  |
-| `0x42` | `[dsaType, chainId, nonce, maxPriorityFeePerGas, maxFeePerGas, gasLimit, to, value, data, accessList, (publicKey), signature]`                                        |
+| Type | RLP field list |
+|---|---|
+| `0x41` | `[dsaType, chainId, nonce, gasPrice, gasLimit, to, value, data, accessList, (publicKey), signature]` |
+| `0x42` | `[dsaType, chainId, nonce, maxPriorityFeePerGas, maxFeePerGas, gasLimit, to, value, data, accessList, (publicKey), signature]` |
 | `0x43` | `[dsaType, chainId, nonce, maxPriorityFeePerGas, maxFeePerGas, gasLimit, to, value, data, accessList, maxFeePerBlobGas, blobVersionedHashes, (publicKey), signature]` |
-| `0x44` | `[dsaType, chainId, nonce, maxPriorityFeePerGas, maxFeePerGas, gasLimit, to, value, data, accessList, authorizationList, (publicKey), signature]`                     |
+| `0x44` | `[dsaType, chainId, nonce, maxPriorityFeePerGas, maxFeePerGas, gasLimit, to, value, data, accessList, authorizationList, (publicKey), signature]` |
 
 - **`dsaType`**: the 2-byte big-endian identifier of the DSA, always encoded as a 2-byte RLP string. For example,
   ML-DSA-44 (`0x0030`) is encoded as `0x82 0x00 0x30`. The identifiers are listed in
@@ -74,10 +74,10 @@ A node can recover the signer's key from an ECDSA signature. A post-quantum sign
 the transaction must carry the key itself. The rule, implemented by `PublicKeyEncoder` and `PublicKeyDecoder`, is to
 carry only what cannot be recovered:
 
-| DSA kind                     | Example                                    | `publicKey` field                                                           |
-| ---------------------------- | ------------------------------------------ | --------------------------------------------------------------------------- |
-| Single recoverable           | `SECP256K1`, `SECP256R1`                   | absent                                                                      |
-| Single non-recoverable       | `MLDSA44`, `FALCON512`                     | the full key (e.g. 1312 bytes for ML-DSA-44)                                |
+| DSA kind | Example | `publicKey` field |
+|---|---|---|
+| Single recoverable | `SECP256K1`, `SECP256R1` | absent |
+| Single non-recoverable | `MLDSA44`, `FALCON512` | the full key (e.g. 1312 bytes for ML-DSA-44) |
 | Hybrid, one half recoverable | `SECP256K1-MLDSA44`, `SECP256K1-FALCON512` | only the post-quantum half (1312 or 896 bytes). The ECDSA half is recovered |
 
 The decoder knows from `dsaType` whether a key is expected and how long it must be. It rejects a key of the wrong length,
@@ -87,13 +87,13 @@ for example a full composite key where only the post-quantum half is expected.
 
 The signature is always one RLP byte string, never `v, r, s`:
 
-| DSA                               | Signature bytes                                              |
-| --------------------------------- | ------------------------------------------------------------ |
-| `SECP256K1`, `SECP256R1`          | 65 bytes: `r (32) ‖ s (32) ‖ recId (1)`, with `recId` 0 or 1 |
-| `MLDSA44` / `MLDSA65` / `MLDSA87` | 2420 / 3309 / 4627 bytes                                     |
-| `FALCON512`                       | variable length (about 650 bytes, 752 at most)               |
-| `SECP256K1-MLDSA44`               | 2485 bytes: ECDSA (65) ‖ ML-DSA-44 (2420)                    |
-| `SECP256K1-FALCON512`             | variable length: ECDSA (65) ‖ Falcon-512                     |
+| DSA | Signature bytes |
+|---|---|
+| `SECP256K1`, `SECP256R1` | 65 bytes: `r (32) ‖ s (32) ‖ recId (1)`, with `recId` 0 or 1 |
+| `MLDSA44` / `MLDSA65` / `MLDSA87` | 2420 / 3309 / 4627 bytes |
+| `FALCON512` | variable length (about 650 bytes, 752 at most) |
+| `SECP256K1-MLDSA44` | 2485 bytes: ECDSA (65) ‖ ML-DSA-44 (2420) |
+| `SECP256K1-FALCON512` | variable length: ECDSA (65) ‖ Falcon-512 |
 
 [Hybrid signatures](03-cryptography/hybrid-signatures.md) explains how the two halves of a hybrid signature are built.
 
@@ -142,10 +142,10 @@ flowchart TD
 authorizing account. A post-quantum account must therefore be able to sign them with its own DSA. `CodeDelegationType`
 has two kinds:
 
-| Kind       | Type byte                | Wire form inside `authorizationList`                                                             |
-| ---------- | ------------------------ | ------------------------------------------------------------------------------------------------ |
-| `LEGACY`   | `0xf8` (internal marker) | an RLP list `[chainId, address, nonce, yParity, r, s]`, exactly as upstream                      |
-| `FLEXIBLE` | `0x01`                   | an RLP **byte string**: `0x01 ‖ rlp([dsaType, chainId, address, nonce, (publicKey), signature])` |
+| Kind | Type byte | Wire form inside `authorizationList` |
+|---|---|---|
+| `LEGACY` | `0xf8` (internal marker) | an RLP list `[chainId, address, nonce, yParity, r, s]`, exactly as upstream |
+| `FLEXIBLE` | `0x01` | an RLP **byte string**: `0x01 ‖ rlp([dsaType, chainId, address, nonce, (publicKey), signature])` |
 
 - The decoder treats a list as legacy and a byte string as typed.
 - Both kinds can be mixed in one `authorizationList`, and both `0x04` and `0x44` transactions accept both kinds.
@@ -158,10 +158,8 @@ has two kinds:
 
 ## Validation
 
+Before validation, decoding rejects a `dsaType` that is not in the node's `--accounts-supported-dsas`. Then
 `MainnetTransactionValidator.validateTransactionSignature` checks every transaction, in this order:
-
-0. **DSA policy.** `dsaType` must be one of the node's `--accounts-supported-dsas`. This check runs earlier, while the
-   transaction is decoded.
 
 1. **Structure.** `signature.isValid(SignatureValidationContext)`:
    - ECDSA: low-`s` against its own curve (malleability protection);
@@ -171,7 +169,8 @@ has two kinds:
 2. **Sender.** The signer's key must be resolvable (see [Sender derivation](#sender-derivation)).
 3. **Signature.**
    - Recoverable DSAs need no further check, because recovery has already authenticated the signer.
-   - Every other DSA runs `dsa.verify(signingHash, signature, resolvedPublicKey)`. For a hybrid, both halves must go through the validation process.
+   - Every other DSA runs `dsa.verify(signingHash, signature, resolvedPublicKey)`. For a hybrid, a recoverable half is
+     authenticated by recovery (step 2), and a non-recoverable half by `verify`.
 
 Every failure is reported as `INVALID_SIGNATURE`. A DSA that is not enabled is rejected with:
 
@@ -181,8 +180,7 @@ DSA type MLDSA44 (0x0030) is not enabled for accounts on this node
 
 For code delegations, `validateCodeDelegation` verifies the signature against the **resolved** signer key. For a hybrid,
 that is the composite key, each half recovered from the signature or carried in the delegation as its own algorithm
-allows. Its errors include
-`Invalid code delegation signature` and `Code delegation signer key could not be resolved`.
+allows. Its errors include `Invalid code delegation signature` and `Code delegation signer key could not be resolved`.
 
 ### Where transaction signatures are checked
 
@@ -190,16 +188,17 @@ This covers transaction signatures only. The other signatures are checked where 
 commit seals and Clique seals in [Consensus](05-consensus.md#bft-messages-qbft-and-ibft-20), discovery packets and node
 records in [Networking](06-networking.md#discovery-v4-packets).
 
-| Stage                                                | Check                                                      |
-| ---------------------------------------------------- | ---------------------------------------------------------- |
-| `eth_sendRawTransaction` / gossip → transaction pool | full validation (`TransactionPool`)                        |
+| Stage | Check |
+|---|---|
+| `eth_sendRawTransaction` / gossip → transaction pool | full validation (`TransactionPool`) |
 | Block processing (proposal validation, import, sync) | signature validation again (`MainnetTransactionProcessor`) |
 
 Checking signatures during block processing is essential. Without it, a malicious block proposer could include a
-transaction that carries a victim's public key for a non-recoverable algorithm (e.g. ML-DSA) with an arbitrary signature, and peers would execute it as the
-victim. To keep this affordable, successful verifications are cached by transaction hash (up to 100 000 entries), so a
-transaction is verified once even though it passes through pool admission, block building, proposal validation and
-import. [Metrics and performance](12-metrics-and-performance.md) discusses the cost.
+transaction that carries a victim's public key for a non-recoverable algorithm (e.g. ML-DSA) with an arbitrary
+signature, and peers would execute it as the victim. To keep this affordable, successful verifications are cached by
+transaction hash (up to 100 000 entries), so a transaction is verified once even though it passes through pool
+admission, block building, proposal validation and import. [Metrics and performance](12-metrics-and-performance.md)
+discusses the cost.
 
 ## Hard-fork activation
 
@@ -235,7 +234,7 @@ costs 21 000 gas, like a standard one, even though its verification is more expe
 larger.
 
 The [DSA microbenchmark](12-metrics-and-performance.md#dsa-microbenchmark-verification-cost-in-gas) measures what
-verification _would_ cost in gas, as input for a future pricing decision.
+verification *would* cost in gas, as input for a future pricing decision.
 
 ## Building and signing transactions in Java
 

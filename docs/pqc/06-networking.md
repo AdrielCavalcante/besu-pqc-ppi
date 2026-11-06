@@ -57,8 +57,9 @@ fork:      hash(32) | signature(sigLen of node DSA)  | (publicKey) | type(1) | R
 - **Public key.** Only a hybrid node writes a key here, and only its non-recoverable half (e.g. 1312 bytes for
   ML-DSA-44). The receiver recovers the recoverable half from the signature (e.g. the first 65 bytes for ECDSA),
   rebuilds the full node ID and verifies the non-recoverable half. A recoverable node DSA (e.g. `SECP256K1`) writes
-  nothing, as upstream. The packet hash covers the key bytes. See `Packet`, `PacketFactory` and `PacketSerializer` in
-  `ethereum/p2p/.../discovery/discv4/internal/packet/`.
+  nothing, as upstream. A pure post-quantum node DSA (e.g. `MLDSA44`) writes nothing either, so discovery cannot
+  identify the sender (see the [support matrix](05-consensus.md#support-matrix)). The packet hash covers the key bytes.
+  See `Packet`, `PacketFactory` and `PacketSerializer` in `ethereum/p2p/.../discovery/discv4/internal/packet/`.
 - **Packet size.** `MAX_PACKET_SIZE_BYTES` is raised from 1280 to **8192** bytes (`PeerDiscoveryAgentV4`). Packets larger
   than the path MTU are fragmented at the IP level, which some NATs and firewalls drop. Prefer flat networks or static
   peers for hybrid nodes behind NAT.
