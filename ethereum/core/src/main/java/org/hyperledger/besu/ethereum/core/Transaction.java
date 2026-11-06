@@ -305,6 +305,19 @@ public class Transaction
     return dsaType;
   }
 
+  /**
+   * Whether any signature in this transaction is made with the network's curve, the genesis
+   * ecCurve: its own when it carries no DSA type, or a code delegation's that carries none.
+   *
+   * @return true if the transaction or one of its code delegations has no DSA type
+   */
+  public boolean isSignedWithNetworkCurve() {
+    return dsaType.isEmpty()
+        || maybeCodeDelegationList
+            .map(delegations -> delegations.stream().anyMatch(d -> d.dsaType().isEmpty()))
+            .orElse(false);
+  }
+
   @Override
   public PublicKey getMountedPublicKey(){
     if(publicKey == null){
