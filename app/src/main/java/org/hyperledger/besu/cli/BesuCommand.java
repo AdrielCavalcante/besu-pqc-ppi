@@ -2707,7 +2707,24 @@ public class BesuCommand implements DefaultCommandValues, Runnable {
     // A node key on an elliptic curve is the network's curve, as ensureNodeDsaMatchesEcCurve
     // guarantees, so the security module handles it just as it always has: from the key file in
     // the data directory by default, or from an external security module.
-    if (!isEllipticCurve(nodeDsaName())) {
+    final String nodeDsaName = nodeDsaName();
+    if (!isEllipticCurve(nodeDsaName)) {
+      // That default is only for an elliptic-curve key, which the security module also generates
+      // there. A hybrid or post-quantum key is never generated, and the "key" file of an existing
+      // data directory holds an elliptic-curve key that would be refused for its length, so the
+      // file has to be given.
+      if (nodePrivateKeyFileOption.getNodePrivateKeyFile() == null) {
+        throw new ParameterException(
+            this.commandLine,
+            "--node-dsa "
+                + nodeDsaName
+                + " needs --node-private-key-file: hybrid and post-quantum node keys are not"
+                + " generated automatically, and the default key file only applies to"
+                + " elliptic-curve node keys. Create one, for example with 'besu operator"
+                + " generate-blockchain-config --node-dsa="
+                + nodeDsaName
+                + "', and pass it with --node-private-key-file.");
+      }
       KeyManagementProvider keyManagementProvider = DSAProviderFactory.getKeyManagementProvider();
       keyManagementProvider.loadNodeKeyPair();
 
