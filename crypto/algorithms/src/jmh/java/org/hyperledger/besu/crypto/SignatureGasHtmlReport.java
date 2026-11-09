@@ -161,8 +161,8 @@ final class SignatureGasHtmlReport {
         .append("</style>\n</head>\n<body>\n<main>\n");
 
     html.append("<h1>Signature gas report</h1>\n")
-        .append("<p class=\"subtitle\">Gas a flexible transaction pays for its signature, per DSA")
-        .append(" type, measured on ")
+        .append("<p class=\"subtitle\">Gas a flexible transaction would pay for its signature")
+        .append(" under the proposed model, per DSA type, measured on ")
         .append(escape(SHOWN_TIMESTAMP.format(report.createdAt())))
         .append(".</p>\n");
 
@@ -349,8 +349,9 @@ final class SignatureGasHtmlReport {
 
   private static void appendTotalGas(final StringBuilder html, final Report report) {
     html.append("<section>\n<h2>How the total gas is computed</h2>\n")
-        .append("<p>The total gas is what a flexible transaction pays for its signature, in place")
-        .append(" of the 21,000 base gas of a legacy transaction. It is a fixed worst case per")
+        .append("<p>The total gas is what a flexible transaction would pay for its signature under")
+        .append(
+            " this model, in place of the 21,000 base gas of a legacy transaction. It is a fixed worst case per")
         .append(" dsaType, so it is known before the transaction is signed: the gas limit is part")
         .append(" of what gets signed, and a Falcon signature changes length every time it is")
         .append(" produced.</p>\n")
@@ -416,7 +417,9 @@ final class SignatureGasHtmlReport {
     html.append("</tbody>\n</table>\n</div>\n")
         .append("<p class=\"lead\" style=\"margin-top:16px\">Not included: calldata, access list,")
         .append(" code delegations and contract creation, which are charged as for any other")
-        .append(" transaction.</p>\n")
+        .append(" transaction. The dsaType field and the length prefixes around the signature and")
+        .append(" the key are left out too: a few bytes each, negligible next to what they")
+        .append(" frame.</p>\n")
         .append("<div class=\"table-wrap\">\n<table>\n<thead><tr>")
         .append("<th>dsaType</th><th>sig bytes</th><th>key bytes</th><th>bytes gas</th>")
         .append("<th>CPU gas</th><th>total gas</th></tr></thead>\n<tbody>\n");

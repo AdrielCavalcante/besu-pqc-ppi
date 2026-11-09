@@ -75,6 +75,12 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
  * end of the algorithm's error interval over the lower end of the baseline's, as a bound to round
  * the relative gas up to.
  *
+ * <p>The total gas column prices a flexible transaction under a proposed model, in place of its
+ * 21,000 base gas: {@value #FLEXIBLE_BASE_GAS} + gas (relative) + {@value #GAS_PER_BYTE} per
+ * signature and key byte. Every byte is priced as non-zero, since the bytes are close to random and
+ * are not known before signing. The dsaType field and the length prefixes around the signature and
+ * the key are left out: a few bytes each.
+ *
  * <p>The table is printed to the console, and the full report, with how the total gas is computed,
  * is written as an HTML page to the directory given with {@value #REPORT_DIR_OPTION}, or to {@value
  * #DEFAULT_REPORT_DIR} under the working directory.
@@ -171,25 +177,34 @@ public class SignatureGasReport {
   /**
    * Takes the {@value #REPORT_DIR_OPTION} option out of the arguments, so the rest can go to JMH,
    * which rejects options it does not know. It is given as {@code --report-dir=<dir>} or {@code
-   * --report-dir <dir>}; a leading {@code ~} stands for the home directory.
+   * --report-dir <dir>}, at most once; a leading {@code ~} stands for the home directory.
    */
   static Path reportDir(final List<String> args) {
-    String dir = DEFAULT_REPORT_DIR;
+    final List<String> dirs = new ArrayList<>();
     for (int i = 0; i < args.size(); ) {
       final String arg = args.get(i);
       if (arg.startsWith(REPORT_DIR_OPTION + "=")) {
-        dir = arg.substring(REPORT_DIR_OPTION.length() + 1);
+        dirs.add(arg.substring(REPORT_DIR_OPTION.length() + 1));
         args.remove(i);
       } else if (arg.equals(REPORT_DIR_OPTION)) {
         if (i + 1 >= args.size()) {
           throw new IllegalArgumentException(REPORT_DIR_OPTION + " needs a directory");
         }
-        dir = args.get(i + 1);
+        dirs.add(args.get(i + 1));
         args.subList(i, i + 2).clear();
       } else {
         i++;
       }
     }
+    // Keeping one of several would silently drop the others, so none is picked.
+    if (dirs.size() > 1) {
+      throw new IllegalArgumentException(
+          REPORT_DIR_OPTION
+              + " was given more than once: "
+              + dirs
+              + ". Through Gradle, set it with -PreportDir, not inside -PjmhArgs.");
+    }
+    String dir = dirs.isEmpty() ? DEFAULT_REPORT_DIR : dirs.get(0);
     if (dir.isBlank()) {
       throw new IllegalArgumentException(REPORT_DIR_OPTION + " needs a directory");
     }
