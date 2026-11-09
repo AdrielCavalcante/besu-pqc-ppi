@@ -136,7 +136,19 @@ public class FrontierGasCalculator implements GasCalculator {
     if (dynamicIntrinsicGasCost == Long.MIN_VALUE || dynamicIntrinsicGasCost == Long.MAX_VALUE) {
       return dynamicIntrinsicGasCost;
     }
-    return clampedAdd(getMinimumTransactionCost(), dynamicIntrinsicGasCost);
+    return clampedAdd(transactionBaseCost(transaction), dynamicIntrinsicGasCost);
+  }
+
+  /**
+   * Returns the fixed part of the intrinsic gas cost: what every transaction pays before its
+   * payload, access list and code delegations. Before flexible transactions it is the same for
+   * every transaction, and it already pays for authenticating one ECDSA signature.
+   *
+   * @param transaction the transaction
+   * @return the fixed part of the intrinsic gas cost
+   */
+  protected long transactionBaseCost(final Transaction transaction) {
+    return getMinimumTransactionCost();
   }
 
   /**

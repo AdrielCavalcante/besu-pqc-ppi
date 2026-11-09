@@ -85,8 +85,7 @@ A suggested matrix:
 
 | Limitation | Reference |
 |---|---|
-| Flexible transactions are accepted under Prague, not under Osaka or later | [Transactions](04-transactions.md#hard-fork-activation) |
-| No gas charged for signature verification | [Transactions](04-transactions.md#gas) |
+| Signature gas prices measured on one machine, with pure-Java post-quantum code | [Transactions](04-transactions.md#gas) |
 | `SECP256K1-FALCON512` node keys: no discovery | [Networking](06-networking.md#falcon-node-keys) |
 | Pure post-quantum node keys cannot open RLPx sessions | [Key management](03-cryptography/key-management.md#key-agreement-ecdh) |
 | Transport key establishment remains classical (ECDHE) | [Security](08-security.md#out-of-scope-and-limitations) |

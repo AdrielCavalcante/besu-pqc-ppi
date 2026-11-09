@@ -174,7 +174,7 @@ that matches the block period and the gas limit.
 In the network log, a block with transactions:
 
 ```text
-node-3  | … | QbftBesuControllerBuilder | Produced block #42 / 1 tx / 0 pending / 21,000 (0.0%) gas / (0x8d07…)
+node-3  | … | QbftBesuControllerBuilder | Produced block #42 / 1 tx / 0 pending / 86,102 (0.0%) gas / (0x8d07…)
 ```
 
 Over JSON-RPC:

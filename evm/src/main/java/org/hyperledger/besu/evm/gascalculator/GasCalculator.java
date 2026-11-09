@@ -543,6 +543,19 @@ public interface GasCalculator {
   long transactionFloorCost(final Bytes transactionPayload, final long payloadZeroBytes);
 
   /**
+   * Returns the floor gas cost of a transaction, i.e. the minimum gas cost that it will be charged
+   * based on its calldata. Introduced in EIP-7623 in Prague. Unlike {@link
+   * #transactionFloorCost(Bytes, long)}, it can start from what the transaction itself costs before
+   * its calldata, such as the base cost of the DSA type of a flexible transaction.
+   *
+   * @param transaction the transaction
+   * @return the transaction's floor gas cost
+   */
+  default long transactionFloorCost(final Transaction transaction) {
+    return transactionFloorCost(transaction.getPayload(), transaction.getPayloadZeroBytes());
+  }
+
+  /**
    * Returns the gas cost of the explicitly declared access list.
    *
    * @param accessListEntries The access list entries

@@ -99,9 +99,10 @@ flowchart TB
   to a new hybrid or post-quantum address.
 - **Mainnet compatibility for post-quantum features.** Flexible transactions are not part of any Ethereum Improvement
   Proposal. They are intended for permissioned and consortium networks.
-- **Gas pricing of verification.** Verification of a PQC signature is not charged in gas yet. The
-  [microbenchmark](12-metrics-and-performance.md#dsa-microbenchmark-verification-cost-in-gas) provides data for a future
-  decision. The base gas cost of flexible transactions is still 21,000
+- **Gas pricing from one machine.** The base cost of each `dsaType` (see [Gas](04-transactions.md#gas)) comes from the
+  [microbenchmark](12-metrics-and-performance.md#dsa-microbenchmark-verification-cost-in-gas) run on a single
+  developer machine. The post-quantum algorithms run on BouncyCastle in pure Java, so a faster implementation would make
+  their CPU part cheaper than priced.
 
 ---
 
