@@ -143,6 +143,11 @@ For security reasons, the "not enabled" error does not list the enabled types. U
 
 - **`eth_sendTransaction`, `eth_call`, `eth_estimateGas`**: their parameter objects have no `dsaType` or `publicKey`.
   Calls behave as in upstream.
+  > ⚠️ **`eth_estimateGas` under-estimates flexible transactions.** It simulates a standard transaction, whose base cost
+  > is 21 000, so the estimate is short by the difference between the base cost of the `dsaType` and 21 000 (see
+  > [Gas](04-transactions.md#gas)): 65 102 gas for `SECP256K1-MLDSA44`, for instance. A client that uses the estimate as
+  > its gas limit gets `intrinsic gas cost … exceeds gas limit` back. Clients that estimate must add
+  > `base cost − 21 000` from the table.
 - **GraphQL**: no new fields. The schema declares `r` and `s` as non-null, so querying them on a non-ECDSA transaction
   can fail. Use JSON-RPC for flexible transactions.
 

@@ -233,6 +233,11 @@ From Prague on, a flexible transaction pays a **base cost that depends on its `d
 standard transaction. Everything else in its intrinsic gas follows upstream rules: calldata, access list, code
 delegations and contract creation are charged on top, as for any other transaction.
 
+> ⚠️ **Code delegations are not priced by `dsaType` yet.** Each authorization of a `0x44` transaction pays the flat
+> EIP-7702 cost of 25 000 gas, whatever its own `dsaType`. An `MLDSA87` authorization, which carries several kB of
+> signature and key and costs far more to verify, pays the same as a `SECP256K1` one. Pricing authorizations by their
+> `dsaType` will come in a later change.
+
 | `dsaType` | Base cost (gas) |
 |---|---|
 | `SECP256K1` | 21 000 |
@@ -263,6 +268,11 @@ base cost = 21 000 - 3 000 - 65 x 16 + CPU gas + 16 x (signature bytes + key byt
 The base cost is fixed per `dsaType`, not computed from the actual bytes, so it is known before signing: the gas limit
 is part of what gets signed. A flexible `SECP256K1` transaction costs exactly 21 000, like a standard one. Set the gas
 limit of a flexible transaction from this table: a transfer signed with `SECP256K1-MLDSA44` needs at least 86 102 gas.
+
+Standard transactions (types `0x00`–`0x04`, signed with r, s and v) keep the upstream 21 000 on every network,
+including one whose genesis `ecCurve` is `secp256r1`, where their signer is recovered on secp256r1. This is intended: the
+fork keeps upstream behaviour for standard transactions and prices only the `dsaType` of flexible ones. On such a
+network, a flexible `SECP256R1` transaction pays 31 629 for the same recovery that a standard one gets for 21 000.
 
 The EIP-7623 calldata floor (Prague) also starts from the base cost of the `dsaType`, not from 21 000:
 
