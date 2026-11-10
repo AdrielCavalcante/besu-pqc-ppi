@@ -55,6 +55,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.PublicKey;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -86,6 +87,8 @@ class FlexibleTransactionBlockProcessingTest {
       Address.fromHexString("0x000000000000000000000000000000000000beef");
   private static final Wei BALANCE = Wei.fromEth(10);
   private static final Wei VALUE = Wei.fromEth(1);
+  // Covers the intrinsic gas of every DSA type, so a transaction is judged by its signature.
+  private static final long GAS_LIMIT = 150_000L;
 
   private ProtocolContext protocolContext;
   private ProtocolSchedule protocolSchedule;
@@ -153,6 +156,43 @@ class FlexibleTransactionBlockProcessingTest {
     assertThat(result.isSuccessful()).as(result.getValidationResult().toString()).isTrue();
   }
 
+  /** Prague brought flexible transactions; every fork after it must keep accepting them. */
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(strings = {"Prague", "Osaka", "Amsterdam"})
+  void executesAFlexibleTransactionInEveryForkFromPragueOn(final String fork) {
+    final KeyPair sender = algorithm(MLDSA).generateNodeKeyPair();
+    startChainFunding(Optional.of(fork), sender.getPublicKey());
+
+    assertThat(protocolSchedule.getByBlockHeader(nextHeader()).getHardforkId().description())
+        .isEqualTo(fork);
+    final TransactionProcessingResult result =
+        processTransaction(signed(MLDSA, sender, Optional.of(sender.getPublicKey())));
+    assertThat(result.isSuccessful()).as(result.getValidationResult().toString()).isTrue();
+  }
+
+  /**
+   * With a large payload the EIP-7623 calldata floor exceeds the intrinsic gas. The floor starts
+   * from the base cost of the DSA type, so the transaction still pays for its signature: 82,553 for
+   * ML-DSA-44 plus 10,000 non-zero bytes at 40 gas (4 tokens of 10 gas each), not 21,000 plus them.
+   */
+  @Test
+  void chargesTheCalldataFloorOnTopOfTheBaseCostOfTheDsaType() {
+    final KeyPair sender = algorithm(MLDSA).generateNodeKeyPair();
+    startChainFunding(sender.getPublicKey());
+
+    final TransactionProcessingResult result =
+        processTransaction(
+            signed(
+                MLDSA,
+                sender,
+                Optional.of(sender.getPublicKey()),
+                Bytes.repeat((byte) 0x01, 10_000),
+                600_000L));
+
+    assertThat(result.isSuccessful()).as(result.getValidationResult().toString()).isTrue();
+    assertThat(result.getGasSpent()).isEqualTo(82_553L + 400_000L);
+  }
+
   /** The signer key is recovered whole from the signature, which authenticates it. */
   @Test
   void executesASecp256k1FlexibleTransaction() {
@@ -195,7 +235,15 @@ class FlexibleTransactionBlockProcessingTest {
    * processor, which executes against the persisted parent state.
    */
   private void startChainFunding(final PublicKey... publicKeys) {
+    startChainFunding(Optional.empty(), publicKeys);
+  }
+
+  /** As above, with the given fork, e.g. "Osaka", active from genesis on top of Prague. */
+  private void startChainFunding(final Optional<String> fork, final PublicKey... publicKeys) {
     final ObjectNode genesis = JsonUtil.objectNodeFromString(readGenesis());
+    fork.ifPresent(
+        name ->
+            ((ObjectNode) genesis.get("config")).put(name.toLowerCase(Locale.ROOT) + "Time", 0));
     final ObjectNode alloc = (ObjectNode) genesis.get("alloc");
     for (final PublicKey publicKey : publicKeys) {
       alloc
@@ -297,15 +345,30 @@ class FlexibleTransactionBlockProcessingTest {
    */
   private static Transaction signed(
       final DSAParametersSet params, final KeyPair signer, final Optional<PublicKey> carriedKey) {
+    return signed(params, signer, carriedKey, Bytes.EMPTY, GAS_LIMIT);
+  }
+
+  private static Transaction signed(
+      final DSAParametersSet params,
+      final KeyPair signer,
+      final Optional<PublicKey> carriedKey,
+      final Bytes payload,
+      final long gasLimit) {
     final DigitalSignatureAlgorithm dsa = algorithm(params);
     final Bytes signingHash =
         Bytes.wrap(
             unsigned(params, carriedKey)
+                .payload(payload)
+                .gasLimit(gasLimit)
                 .signature(dsa.sign(Bytes32.ZERO, signer.getPrivateKey()))
                 .build()
                 .getSigningHash());
     final Signature signature = dsa.sign(signingHash, signer.getPrivateKey());
-    return unsigned(params, carriedKey).signature(signature).build();
+    return unsigned(params, carriedKey)
+        .payload(payload)
+        .gasLimit(gasLimit)
+        .signature(signature)
+        .build();
   }
 
   private static Transaction.Builder unsigned(
@@ -317,7 +380,7 @@ class FlexibleTransactionBlockProcessingTest {
         .nonce(0)
         .maxPriorityFeePerGas(Wei.of(1))
         .maxFeePerGas(Wei.of(10))
-        .gasLimit(21_000)
+        .gasLimit(GAS_LIMIT)
         .to(RECIPIENT)
         .value(VALUE)
         .payload(Bytes.EMPTY)

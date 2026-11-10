@@ -76,7 +76,7 @@ so a secp256r1 network can still accept `SECP256K1-MLDSA44` flexible transaction
 
 ## Hard fork
 
-Flexible transactions are accepted from **Prague** onwards, but not under **Osaka** or later forks (see
+Flexible transactions are accepted from **Prague** onwards, including Osaka, the BPO forks and Amsterdam (see
 [Transactions → Hard-fork activation](04-transactions.md#hard-fork-activation)). A suitable genesis `config` section:
 
 ```json

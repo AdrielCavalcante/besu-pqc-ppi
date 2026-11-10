@@ -288,9 +288,9 @@ public class MainnetTransactionValidator implements TransactionValidator {
 
   /**
    * A standard transaction, or a code delegation without a DSA type, is signed with the network's
-   * curve, the genesis ecCurve, and never looks its algorithm up among the account-enabled ones
-   * the way a flexible one does. This holds it to the same list, so leaving SECP256K1 or SECP256R1
-   * out of the account-supported DSAs refuses standard signatures made with it too.
+   * curve, the genesis ecCurve, and never looks its algorithm up among the account-enabled ones the
+   * way a flexible one does. This holds it to the same list, so leaving SECP256K1 or SECP256R1 out
+   * of the account-supported DSAs refuses standard signatures made with it too.
    */
   private ValidationResult<TransactionInvalidReason> validateCurveEnabled(
       final Transaction transaction) {
@@ -370,8 +370,7 @@ public class MainnetTransactionValidator implements TransactionValidator {
     final long intrinsicGasCostOrFloor =
         Math.max(
             gasCalculator.transactionIntrinsicGasCost(transaction, baselineGas),
-            gasCalculator.transactionFloorCost(
-                transaction.getPayload(), transaction.getPayloadZeroBytes()));
+            gasCalculator.transactionFloorCost(transaction));
 
     if (Long.compareUnsigned(intrinsicGasCostOrFloor, transaction.getGasLimit()) > 0) {
       return ValidationResult.invalid(

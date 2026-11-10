@@ -448,9 +448,7 @@ public class MainnetTransactionProcessor {
       // For pre-Prague forks, floor cost is 0, so this returns just execution gas
       // For Prague+ forks with EIP-7778, this ensures block gas accounts for data floor
       final long executionGas = transaction.getGasLimit() - initialFrame.getRemainingGas();
-      final long floorCost =
-          gasCalculator.transactionFloorCost(
-              transaction.getPayload(), transaction.getPayloadZeroBytes());
+      final long floorCost = gasCalculator.transactionFloorCost(transaction);
       final long gasUsedByTransaction = Math.max(executionGas, floorCost);
 
       // update the coinbase

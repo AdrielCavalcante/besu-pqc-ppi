@@ -15,20 +15,26 @@
 package org.hyperledger.besu.evm.gascalculator;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
+import org.hyperledger.besu.crypto.algorithms.parameters.DSAParametersSet;
 import org.hyperledger.besu.datatypes.Address;
 import org.hyperledger.besu.datatypes.Transaction;
 import org.hyperledger.besu.evm.frame.MessageFrame;
 
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 
 import org.apache.tuweni.bytes.Bytes;
 import org.assertj.core.api.AssertionsForClassTypes;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -165,5 +171,102 @@ class PragueGasCalculatorTest {
             pragueGasCalculator.transactionFloorCost(
                 Bytes.fromHexString("0x0001000100010001000101"), 5))
         .isEqualTo(21290L);
+  }
+
+  @Test
+  void standardTransactionPaysTheStandardBaseCost() {
+    givenTransfer(Optional.empty(), Bytes.EMPTY);
+
+    assertThat(pragueGasCalculator.transactionIntrinsicGasCost(transaction, 0L)).isEqualTo(21_000L);
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "SECP256K1, 21000",
+    "SECP256R1, 31629",
+    "MLDSA44, 82553",
+    "MLDSA65, 110047",
+    "MLDSA87, 147047",
+    "FALCON512, 46511",
+    "SECP256K1MLDSA44, 86102",
+    "SECP256K1FALCON512, 50369"
+  })
+  void flexibleTransactionPaysTheBaseCostOfItsDsaType(
+      final DSAParametersSet dsaType, final long baseCost) {
+    givenTransfer(Optional.of(dsaType.getId()), Bytes.EMPTY);
+
+    assertThat(pragueGasCalculator.transactionIntrinsicGasCost(transaction, 0L))
+        .isEqualTo(baseCost);
+  }
+
+  @ParameterizedTest
+  @EnumSource(DSAParametersSet.class)
+  void noDsaTypeIsCheaperThanTheSecp256k1SignatureOfAStandardTransaction(
+      final DSAParametersSet dsaType) {
+    assertThat(pragueGasCalculator.dsaBaseCost(dsaType))
+        .isGreaterThanOrEqualTo(pragueGasCalculator.getMinimumTransactionCost());
+  }
+
+  @Test
+  void flexibleTransactionPaysForItsPayloadAndAccessListOnTopOfItsBaseCost() {
+    // 10 non-zero bytes at 16 gas, and 2,400 gas of access list passed as baseline gas
+    givenTransfer(Optional.of(DSAParametersSet.MLDSA44.getId()), Bytes.repeat((byte) 0x1, 10));
+
+    assertThat(pragueGasCalculator.transactionIntrinsicGasCost(transaction, 2_400L))
+        .isEqualTo(82_553L + 160L + 2_400L);
+  }
+
+  @Test
+  void flexibleTransactionWithAnUnknownDsaTypeCannotBePaidFor() {
+    givenTransfer(Optional.of((short) 0x7fff), Bytes.EMPTY);
+
+    assertThat(pragueGasCalculator.transactionIntrinsicGasCost(transaction, 0L))
+        .isEqualTo(Long.MAX_VALUE);
+  }
+
+  @Test
+  void osakaKeepsThePragueBaseCostOfFlexibleTransactions() {
+    givenTransfer(Optional.of(DSAParametersSet.MLDSA44.getId()), Bytes.EMPTY);
+
+    assertThat(new OsakaGasCalculator().transactionIntrinsicGasCost(transaction, 0L))
+        .isEqualTo(82_553L);
+  }
+
+  @Test
+  void floorOfAFlexibleTransactionStartsFromTheBaseCostOfItsDsaType() {
+    // 10,000 non-zero bytes = 40,000 tokens at 10 gas; the signature stays within the base cost
+    givenTransfer(Optional.of(DSAParametersSet.MLDSA44.getId()), Bytes.repeat((byte) 0x1, 10_000));
+
+    assertThat(pragueGasCalculator.transactionFloorCost(transaction)).isEqualTo(82_553L + 400_000L);
+  }
+
+  @Test
+  void floorOfAStandardTransactionStillStartsFrom21000() {
+    givenTransfer(Optional.empty(), Bytes.repeat((byte) 0x1, 256));
+
+    assertThat(pragueGasCalculator.transactionFloorCost(transaction))
+        .isEqualTo(pragueGasCalculator.transactionFloorCost(Bytes.repeat((byte) 0x1, 256), 0))
+        .isEqualTo(31_240L);
+  }
+
+  @Test
+  void refundOfAFlexibleTransactionKeepsItsFloor() {
+    // execution used 242,553 (intrinsic only) of a 600,000 limit; the floor is 482,553
+    givenTransfer(Optional.of(DSAParametersSet.MLDSA44.getId()), Bytes.repeat((byte) 0x1, 10_000));
+    when(transaction.getGasLimit()).thenReturn(600_000L);
+    when(messageFrame.getSelfDestructs()).thenReturn(Collections.emptySet());
+    when(messageFrame.getGasRefund()).thenReturn(0L);
+    when(messageFrame.getRemainingGas()).thenReturn(600_000L - 242_553L);
+
+    assertThat(pragueGasCalculator.calculateGasRefund(transaction, messageFrame, 0L))
+        .isEqualTo(600_000L - 482_553L);
+  }
+
+  private void givenTransfer(final Optional<Short> dsaType, final Bytes payload) {
+    when(transaction.getDsaType()).thenReturn(dsaType);
+    when(transaction.getPayload()).thenReturn(payload);
+    when(transaction.getPayloadZeroBytes()).thenReturn(0L);
+    // the intrinsic gas reads it, the floor does not
+    lenient().when(transaction.isContractCreation()).thenReturn(false);
   }
 }

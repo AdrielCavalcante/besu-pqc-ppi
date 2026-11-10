@@ -135,14 +135,19 @@ Entries of `authorizationList` (types `0x04` and `0x44`) are returned by `CodeDe
 |---|---|---|
 | The DSA type is not enabled on the node | `-32602` | `DSA type MLDSA44 (0x0030) is not enabled for accounts on this node` |
 | Bad signature, signer cannot be resolved, wrong key length | `-32002` | `Invalid signature` |
-| The type is not accepted by the active hard fork (e.g. Osaka) | `-32602` family | `Transaction type … is invalid, accepted transaction types are …` |
+| The type is not accepted by the active hard fork (any fork before Prague) | `-32602` family | `Transaction type … is invalid, accepted transaction types are …` |
 
 For security reasons, the "not enabled" error does not list the enabled types. Use `vnt_getAccountsSupportedDSAs`.
 
 ## Not supported
 
 - **`eth_sendTransaction`, `eth_call`, `eth_estimateGas`**: their parameter objects have no `dsaType` or `publicKey`.
-  Calls behave as in upstream.
+  Calls behave as in upstream, simulating a standard transaction.
+  > ⚠️ **`eth_estimateGas` under-estimates flexible transactions.** It simulates a standard transaction, whose base cost
+  > is 21 000, so the estimate is short by the difference between the base cost of the `dsaType` and 21 000 (see
+  > [Gas](04-transactions.md#gas)): 65 102 gas for `SECP256K1-MLDSA44`, for instance. A client that uses the estimate as
+  > its gas limit gets `intrinsic gas cost … exceeds gas limit` back. Clients that estimate must add
+  > `base cost − 21 000` from the table.
 - **GraphQL**: no new fields. The schema declares `r` and `s` as non-null, so querying them on a non-ECDSA transaction
   can fail. Use JSON-RPC for flexible transactions.
 
