@@ -142,7 +142,7 @@ For security reasons, the "not enabled" error does not list the enabled types. U
 ## Not supported
 
 - **`eth_sendTransaction`, `eth_call`, `eth_estimateGas`**: their parameter objects have no `dsaType` or `publicKey`.
-  Calls behave as in upstream.
+  Calls behave as in upstream, simulating a standard transaction.
   > ⚠️ **`eth_estimateGas` under-estimates flexible transactions.** It simulates a standard transaction, whose base cost
   > is 21 000, so the estimate is short by the difference between the base cost of the `dsaType` and 21 000 (see
   > [Gas](04-transactions.md#gas)): 65 102 gas for `SECP256K1-MLDSA44`, for instance. A client that uses the estimate as

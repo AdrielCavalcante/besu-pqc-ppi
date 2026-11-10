@@ -233,10 +233,10 @@ From Prague on, a flexible transaction pays a **base cost that depends on its `d
 standard transaction. Everything else in its intrinsic gas follows upstream rules: calldata, access list, code
 delegations and contract creation are charged on top, as for any other transaction.
 
-> ⚠️ **Code delegations are not priced by `dsaType` yet.** Each authorization of a `0x44` transaction pays the flat
-> EIP-7702 cost of 25 000 gas, whatever its own `dsaType`. An `MLDSA87` authorization, which carries several kB of
-> signature and key and costs far more to verify, pays the same as a `SECP256K1` one. Pricing authorizations by their
-> `dsaType` will come in a later change.
+> ⚠️ **Code delegations are not priced by `dsaType` yet.** Each authorization of a `0x44` transaction pays the EIP-7702
+> cost, whatever its own `dsaType`: 25 000 gas, of which 12 500 is refunded when the authorizing account already
+> exists. An `MLDSA87` authorization, which carries several kB of signature and key and costs far more to verify, pays
+> the same as a `SECP256K1` one. Pricing authorizations by their `dsaType` will come in a later change.
 
 | `dsaType` | Base cost (gas) |
 |---|---|
