@@ -72,7 +72,8 @@ Implemented by `crypto/algorithms/.../algorithms/MLDSA.java`. Three parameter se
 | Randomness | **Deterministic** signing (FIPS 204 deterministic variant: no random input is given to the signer) |
 | Thread safety | A new Bouncy Castle `MLDSASigner` is created for each signature and each verification, because the signer keeps SHAKE state |
 | Private key | Stored in the **expanded** form (`rho ‖ K ‖ tr ‖ s1 ‖ s2 ‖ t0`). A 32-byte input is treated as a **seed** and expanded when loaded |
-| Public key | Always derived from the private key when a key is loaded |
+| Public key | Always derived from the private key when a key is loaded. A key built from bytes (`MLDSAPublicKey.create`, which `KeyFactory.createPublicKey` and, through it, the transaction, code delegation and consensus decoders use) must have the exact length of its parameter set, 1312, 1952 or 2592 bytes; any other length is refused with `Expected a MLDSA44 public key of 1312 bytes, got 100` |
+| Verification | Returns `false`, rather than throwing, for a key of the wrong length or any input Bouncy Castle rejects, as Falcon does. A transaction does not get this far with a wrong-length key: the decoder refuses it first |
 | Key generation | Bouncy Castle `MLDSAKeyPairGenerator` with Besu's `SecureRandom` |
 
 ## Falcon-512

@@ -81,7 +81,8 @@ carry only what cannot be recovered:
 | Hybrid, one half recoverable | `SECP256K1-MLDSA44`, `SECP256K1-FALCON512` | only the post-quantum half (1312 or 896 bytes). The ECDSA half is recovered |
 
 The decoder knows from `dsaType` whether a key is expected and how long it must be. It rejects a key of the wrong length,
-for example a full composite key where only the post-quantum half is expected.
+for example a full composite key where only the post-quantum half is expected, or a 100-byte key where the 1312 bytes
+of an ML-DSA-44 key are expected.
 
 ## The signature field
 
