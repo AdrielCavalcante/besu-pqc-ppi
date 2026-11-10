@@ -72,9 +72,9 @@ The values above illustrate the format. They are not reference measurements.
 
 ## DSA microbenchmark: verification cost in gas
 
-The fork does not charge gas for signature verification, although verifying a post-quantum signature is more expensive
-than recovering an ECDSA key. The microbenchmark measures that cost and expresses it in gas, as input for a pricing
-decision.
+Verifying a post-quantum signature is more expensive than recovering an ECDSA key. The microbenchmark measures that cost
+and expresses it in gas. Its `gas (relative)` column is the CPU part of the base cost each `dsaType` pays (see
+[Gas](04-transactions.md#gas)); re-run it before changing those prices.
 
 Sources, in `crypto/algorithms/src/jmh/java/org/hyperledger/besu/crypto/`:
 
@@ -126,7 +126,7 @@ All algorithms are measured in the same run, so load on the machine mostly cance
 ## Performance design
 
 Measures taken so that post-quantum verification can run on every node and at every stage (see
-[Transactions → Validation](04-transactions.md#where-signatures-are-checked)):
+[Transactions → Validation](04-transactions.md#where-transaction-signatures-are-checked)):
 
 | Measure | Effect |
 |---|---|

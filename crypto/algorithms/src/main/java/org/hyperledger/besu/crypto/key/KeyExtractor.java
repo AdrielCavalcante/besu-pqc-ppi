@@ -10,19 +10,20 @@ public class KeyExtractor {
             final DSAParametersSet params,
             final PrivateKeyRepresentation representation) {
 
-        final Integer length;
+        return keyBytes.slice(fromIndex, privateKeyLength(params, representation));
+    }
+
+    /** The length of a private key of {@code params} in the given representation. */
+    public Integer privateKeyLength(
+            final DSAParametersSet params, final PrivateKeyRepresentation representation) {
         switch (representation) {
             case EXPANDED:
-                length = params.getPrivateKeyLength();
-                break;
+                return params.getPrivateKeyLength();
             case SEED:
-                length = params.getSeedLength();
-                break;
+                return params.getSeedLength();
             default:
                 throw new IllegalArgumentException("Unsupported private key representation: " + representation);
         }
-
-        return keyBytes.slice(fromIndex, length);
     }
 
     public Bytes extractPublicKeyBytesAtOffset(

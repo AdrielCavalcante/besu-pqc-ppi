@@ -53,9 +53,14 @@ tasks.register('signatureGasReport', JavaExec) {
   dependsOn tasks.named('jmhJar')
   classpath = files(tasks.named('jmhJar').flatMap { it.archiveFile })
   mainClass = 'org.hyperledger.besu.crypto.SignatureGasReport'
-  // JMH options for the report, e.g. -PjmhArgs="-p dsaType=SECP256K1,MLDSA87"
+  // JMH options for the report, e.g. -PjmhArgs="-p dsaType=SECP256K1,MLDSA87". The report
+  // directory is set with -PreportDir below, not here, since the task always passes its own.
   if (project.hasProperty('jmhArgs')) {
-    args project.property('jmhArgs').toString().split(' ')
+    final String jmhArgs = project.property('jmhArgs').toString()
+    if (jmhArgs.contains('--report-dir')) {
+      throw new GradleException('Set the report directory with -PreportDir=<dir>, not inside -PjmhArgs')
+    }
+    args jmhArgs.split(' ')
   }
   // -PallowJavaBaseline (or =true) runs the report even when the native secp256k1 library does not
   // load. The value is passed on and parsed by the report, so =false keeps the check.
@@ -64,4 +69,14 @@ tasks.register('signatureGasReport', JavaExec) {
     systemProperty 'signatureGasReport.allowJavaBaseline',
       allowJavaBaseline.isEmpty() ? 'true' : allowJavaBaseline
   }
+  // The HTML report goes to build/reports/signature-gas at the repository root, next to the other
+  // reports of the build, or to -PreportDir=<dir>: absolute, under ~, or relative to the root.
+  String reportDir = project.findProperty('reportDir')?.toString() ?: ''
+  if (reportDir == '~' || reportDir.startsWith('~/')) {
+    reportDir = System.getProperty('user.home') + reportDir.substring(1)
+  }
+  final File reportDirFile = reportDir.isEmpty()
+    ? rootProject.layout.buildDirectory.dir('reports/signature-gas').get().asFile
+    : rootProject.file(reportDir)
+  args "--report-dir=${reportDirFile.absolutePath}"
 }

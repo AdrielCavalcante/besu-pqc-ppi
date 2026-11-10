@@ -8,7 +8,6 @@ Ethereum transactions do not say which algorithm signed them. Everything assumes
 `(v, r, s)` and the sender is recovered from it. The fork adds **flexible transactions**, which are algorithm-agnostic: they drop `v`, `r` and `s` altogether, name their DSA, carry a signature of any length and, when the DSA cannot recover
 the public key from the signature, carry the signer's public key.
 
-
 Standard transaction types (`0x00`–`0x04`) are unchanged and keep working.
 
 ## Contents
@@ -121,17 +120,19 @@ in `Transaction.java` (`flexibleEip1559Preimage`, `flexibleAccessListPreimage`, 
 ```mermaid
 flowchart TD
   T[Flexible transaction] --> D{dsaType}
-  D -->|recoverable<br/>SECP256K1/R1| R[Recover the key from the signature]
-  D -->|non-recoverable<br/>ML-DSA, Falcon| P[Take the carried publicKey]
-  D -->|hybrid| H["Recover the ECDSA half<br/>+ take the carried PQ half<br/>→ CompositePublicKey"]
-  R --> A["sender = keccak256(publicKey)[12:]"]
+  D -->|recoverable<br/>e.g. SECP256K1, SECP256R1| R["<b>publicKey</b> = key recovered<br/>from the signature"]
+  D -->|non-recoverable<br/>e.g. ML-DSA, Falcon| P["<b>publicKey</b> = key carried<br/>in the transaction"]
+  D -->|hybrid<br/>e.g. SECP256K1-MLDSA44| H["<b>publicKey</b> = firstKey ‖ secondKey<br/>(CompositePublicKey), each half<br/>resolved as its own algorithm's key"]
+  R --> A["sender = keccak256(<b>publicKey</b>)[-20:]"]
   P --> A
   H --> A
 ```
 
 - `PublicKeyHandler.resolvePublicKey` resolves the key, and `Transaction.getSender()` derives the address.
-- For a hybrid, the address is the hash of the **concatenated** key `ecdsaKey ‖ pqKey`. The address therefore commits
-  to both keys, and a hybrid account is a different account from the ECDSA-only account with the same ECDSA key.
+- For a hybrid, each half of the key is resolved the way its own algorithm's key is: recovered from the signature
+  when that algorithm allows it, carried in the transaction otherwise. The address is computed over the
+  **concatenated** key `firstKey ‖ secondKey`, in the order the hybrid names its algorithms. The address therefore
+  commits to both keys, and a hybrid account is a different account from the account of either key on its own.
 - Senders are cached by transaction hash. `Transaction.resolvableSender()` returns an empty result instead of throwing
   when the key cannot be resolved, so such a transaction is rejected with `INVALID_SIGNATURE` instead of causing an
   internal error.
@@ -151,13 +152,14 @@ has two kinds:
 - Both kinds can be mixed in one `authorizationList`, and both `0x04` and `0x44` transactions accept both kinds.
 - A flexible delegation signs `keccak256(0x05 ‖ 0x01 ‖ rlp([0x01, dsaType, chainId, address, nonce, (publicKey)]))`.
 - The `publicKey` rule is the same as for transactions.
-- The authority is `keccak256(resolvedPublicKey)[12:]`.
+- The authority is `keccak256(resolvedPublicKey)[-20:]`.
 
 > **Compatibility note:** changing the flexible delegation signing layout would invalidate every delegation already
 > signed. The layout is defined in `CodeDelegation.computeSenderRecoveryHash`.
 
 ## Validation
 
+Before validation, decoding rejects a `dsaType` that is not in the node's `--accounts-supported-dsas`. Then
 `MainnetTransactionValidator.validateTransactionSignature` checks every transaction, in this order:
 
 1. **Structure.** `signature.isValid(SignatureValidationContext)`:
@@ -168,9 +170,8 @@ has two kinds:
 2. **Sender.** The signer's key must be resolvable (see [Sender derivation](#sender-derivation)).
 3. **Signature.**
    - Recoverable DSAs need no further check, because recovery has already authenticated the signer.
-   - Every other DSA runs `dsa.verify(signingHash, signature, resolvedPublicKey)`. For a hybrid, both halves must verify.
-4. **DSA policy.** `dsaType` must be one of the node's `--accounts-supported-dsas`. This check runs earlier, while the
-   transaction is decoded.
+   - Every other DSA runs `dsa.verify(signingHash, signature, resolvedPublicKey)`. For a hybrid, a recoverable half is
+     authenticated by recovery (step 2), and a non-recoverable half by `verify`.
 
 Every failure is reported as `INVALID_SIGNATURE`. A DSA that is not enabled is rejected with:
 
@@ -179,10 +180,18 @@ DSA type MLDSA44 (0x0030) is not enabled for accounts on this node
 ```
 
 For code delegations, `validateCodeDelegation` verifies the signature against the **resolved** signer key. For a hybrid,
-that is the recovered ECDSA half plus the carried post-quantum half. Its errors include
-`Invalid code delegation signature` and `Code delegation signer key could not be resolved`.
+that is the composite key, each half recovered from the signature or carried in the delegation as its own algorithm
+allows. Its errors include `Invalid code delegation signature` and `Code delegation signer key could not be resolved`.
 
-### Where signatures are checked
+Unlike [EIP-7702](https://eips.ethereum.org/EIPS/eip-7702), where an invalid authorization is skipped, a delegation
+whose DSA is not enabled invalidates the **whole transaction**, whatever its type. That includes a legacy delegation
+(no `dsaType`, signed with the network curve) when the network curve is left out of `--accounts-supported-dsas`.
+
+### Where transaction signatures are checked
+
+This covers transaction signatures only. The other signatures are checked where they are received: consensus messages,
+commit seals and Clique seals in [Consensus](05-consensus.md#bft-messages-qbft-and-ibft-20), discovery packets and node
+records in [Networking](06-networking.md#discovery-v4-packets).
 
 | Stage | Check |
 |---|---|
@@ -190,24 +199,22 @@ that is the recovered ECDSA half plus the carried post-quantum half. Its errors 
 | Block processing (proposal validation, import, sync) | signature validation again (`MainnetTransactionProcessor`) |
 
 Checking signatures during block processing is essential. Without it, a malicious block proposer could include a
-transaction that carries a victim's ML-DSA public key with an arbitrary signature, and peers would execute it as the
-victim. To keep this affordable, successful verifications are cached by transaction hash (up to 100 000 entries), so a
-transaction is verified once even though it passes through pool admission, block building, proposal validation and
-import. [Metrics and performance](12-metrics-and-performance.md) discusses the cost.
+transaction that carries a victim's public key for a non-recoverable algorithm (e.g. ML-DSA) with an arbitrary
+signature, and peers would execute it as the victim. To keep this affordable, successful verifications are cached by
+transaction hash (up to 100 000 entries), so a transaction is verified once even though it passes through pool
+admission, block building, proposal validation and import. [Metrics and performance](12-metrics-and-performance.md)
+discusses the cost.
 
 ## Hard-fork activation
 
-The flexible types are added to the accepted transaction types in the **Prague** protocol specification
-(`MainnetProtocolSpecs.pragueDefinition`). Use a genesis with `pragueTime: 0`, as the companion
-[besu-qbft](11-usage/running-a-network.md) network does.
+The flexible types are accepted from **Prague** on. They are added to the accepted transaction types in the Prague
+protocol specification (`MainnetProtocolSpecs.pragueDefinition`), and again in Osaka's (`osakaDefinition`), which
+redefines that set; the BPO and Amsterdam specifications are built on Osaka and inherit it. Use a genesis with at least
+`pragueTime: 0`, as the companion [besu-qbft](11-usage/running-a-network.md) network does.
 
-> ⚠️ **Osaka and later forks:** the Osaka specification (and the BPO and Amsterdam specifications built on it)
-> redefines the accepted types and does **not** currently include the flexible types. Do not schedule `osakaTime` on a
-> network that uses flexible transactions.
-
-When a type is not accepted, the transaction is rejected with
-`Transaction type … is invalid, accepted transaction types are …`. Under Prague, `FLEXIBLE_BLOB` accepts only
-KZG-proof blobs, like `BLOB`.
+Before Prague, a flexible transaction is rejected with
+`Transaction type … is invalid, accepted transaction types are …`. `FLEXIBLE_BLOB` accepts the same blobs as `BLOB`:
+KZG-proof blobs under Prague, cell-proof blobs from Osaka on.
 
 ## Transaction pool
 
@@ -223,13 +230,64 @@ Each flexible code delegation adds its key and signature on top of the base entr
 
 ## Gas
 
-**The fork does not add gas charges for signature verification**, and intrinsic gas follows upstream rules. Keys and
-signatures are not part of the transaction payload (`data`), so they do not add calldata gas either. A flexible transfer
-costs 21 000 gas, like a standard one, even though its verification is more expensive and the transaction is much
-larger.
+From Prague on, a flexible transaction pays a **base cost that depends on its `dsaType`**, in place of the 21 000 of a
+standard transaction. Everything else in its intrinsic gas follows upstream rules: calldata, access list, code
+delegations and contract creation are charged on top, as for any other transaction.
 
-The [DSA microbenchmark](12-metrics-and-performance.md#dsa-microbenchmark-verification-cost-in-gas) measures what
-verification *would* cost in gas, as input for a future pricing decision.
+> ⚠️ **Code delegations are not priced by `dsaType` yet.** Each authorization of a `0x44` transaction pays the EIP-7702
+> cost, whatever its own `dsaType`: 25 000 gas, of which 12 500 is refunded when the authorizing account already
+> exists. An `MLDSA87` authorization, which carries several kB of signature and key and costs far more to verify, pays
+> the same as a `SECP256K1` one. Pricing authorizations by their `dsaType` will come in a later change.
+
+| `dsaType` | Base cost (gas) |
+|---|---|
+| `SECP256K1` | 21 000 |
+| `SECP256R1` | 31 629 |
+| `MLDSA44` | 82 553 |
+| `MLDSA65` | 110 047 |
+| `MLDSA87` | 147 047 |
+| `FALCON512` | 46 511 |
+| `SECP256K1-MLDSA44` | 86 102 |
+| `SECP256K1-FALCON512` | 50 369 |
+
+The 21 000 of a standard transaction already pays for one secp256k1 signature: recovering the signer, priced like the
+3 000 gas of the ECRECOVER precompile, and carrying its 65 bytes of r, s and v. A flexible transaction swaps that
+signature for its own:
+
+```
+base cost = 21 000 - 3 000 - 65 x 16 + CPU gas + 16 x (signature bytes + key bytes)
+```
+
+- **CPU gas** is the cost of authenticating the signature, measured by the
+  [DSA microbenchmark](12-metrics-and-performance.md#dsa-microbenchmark-verification-cost-in-gas) relative to a
+  secp256k1 key recovery: a recovery for recoverable algorithms, a verification for the others, and each half by its own
+  rule for hybrids.
+- **Signature and key bytes** are priced like non-zero calldata bytes (16 gas). The signature counts at its maximum
+  length (752 bytes for Falcon-512, whose signatures vary), and the key only when the transaction carries it (see
+  [The public key field](#the-public-key-field)).
+
+The base cost is fixed per `dsaType`, not computed from the actual bytes, so it is known before signing: the gas limit
+is part of what gets signed. A flexible `SECP256K1` transaction costs exactly 21 000, like a standard one. Set the gas
+limit of a flexible transaction from this table: a transfer signed with `SECP256K1-MLDSA44` needs at least 86 102 gas.
+
+Standard transactions (types `0x00`–`0x04`, signed with r, s and v) keep the upstream 21 000 on every network,
+including one whose genesis `ecCurve` is `secp256r1`, where their signer is recovered on secp256r1. This is intended: the
+fork keeps upstream behaviour for standard transactions and prices only the `dsaType` of flexible ones. On such a
+network, a flexible `SECP256R1` transaction pays 31 629 for the same recovery that a standard one gets for 21 000.
+
+The EIP-7623 calldata floor (Prague) also starts from the base cost of the `dsaType`, not from 21 000:
+
+```
+floor = base cost + 10 x (zero bytes + 4 x non-zero bytes of data)
+```
+
+A transaction pays the larger of its gas and its floor. Starting the floor from the base cost keeps a flexible transaction
+with a large payload paying for its signature, whose bytes stay priced at 16 gas each inside the base cost: only `data`
+counts as floor tokens. With 10 000 non-zero bytes of data, a `MLDSA44` transaction pays 82 553 + 400 000 = 482 553 gas,
+where a floor from 21 000 would have charged it the same 421 000 as a standard transaction.
+
+The prices are in `PragueGasCalculator#dsaBaseCost`. Changing them changes which blocks are valid, so
+every node of a network must run the same values.
 
 ## Building and signing transactions in Java
 
@@ -245,7 +303,7 @@ Transaction tx = Transaction.builder()
     .nonce(0)
     .maxPriorityFeePerGas(Wei.ZERO)
     .maxFeePerGas(Wei.ZERO)
-    .gasLimit(21_000)
+    .gasLimit(100_000)                       // at least the 86 102 base cost of SECP256K1-MLDSA44
     .to(Address.fromHexString("0xf17f52151EbEF6C7334FAD080c5704D77216b732"))
     .value(Wei.ZERO)
     .payload(Bytes.EMPTY)

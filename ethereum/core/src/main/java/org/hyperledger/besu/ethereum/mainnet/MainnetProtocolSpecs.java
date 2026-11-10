@@ -1035,7 +1035,13 @@ public abstract class MainnetProtocolSpecs {
                         TransactionType.ACCESS_LIST,
                         TransactionType.EIP1559,
                         TransactionType.BLOB,
-                        TransactionType.DELEGATE_CODE),
+                        TransactionType.DELEGATE_CODE,
+                        // flexible transactions, accepted since Prague; the forks after Osaka
+                        // inherit this set
+                        TransactionType.FLEXIBLE_ACCESS_LIST,
+                        TransactionType.FLEXIBLE_EIP1559,
+                        TransactionType.FLEXIBLE_BLOB,
+                        TransactionType.FLEXIBLE_DELEGATE_CODE),
                     Set.of(BlobType.KZG_CELL_PROOFS),
                     evm.getMaxInitcodeSize()))
         .transactionPoolPreProcessor(new OsakaTransactionPoolPreProcessor())

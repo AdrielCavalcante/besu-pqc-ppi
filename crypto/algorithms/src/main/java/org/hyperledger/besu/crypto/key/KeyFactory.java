@@ -58,6 +58,18 @@ public class KeyFactory {
                 sk = FalconPrivateKey.create(privateKeyBytes, paramsSet);
                 break;
       case SECP256K1MLDSA44:
+        // Both halves have a fixed length, so the whole key has one too. Checked up front, as
+        // for SECP256K1-FALCON512, instead of failing on an out-of-bounds slice below.
+        final int expectedSkLength =
+            keyExtractor.privateKeyLength(DSAParametersSet.SECP256K1, firstSkRep)
+                + keyExtractor.privateKeyLength(DSAParametersSet.MLDSA44, secondSkRep);
+        if (privateKeyBytes.size() != expectedSkLength) {
+          throw new IllegalArgumentException(
+              "SECP256K1-MLDSA44 private key must be "
+                  + expectedSkLength
+                  + " bytes, got "
+                  + privateKeyBytes.size());
+        }
         Bytes secpSkBytes =
             keyExtractor.extractPrivateKeyBytesAtOffset(
                 privateKeyBytes, 0, DSAParametersSet.SECP256K1, firstSkRep);

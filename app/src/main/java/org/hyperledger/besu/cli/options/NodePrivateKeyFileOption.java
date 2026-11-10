@@ -38,7 +38,9 @@ public class NodePrivateKeyFileOption {
       names = {"--node-private-key-file"},
       paramLabel = MANDATORY_PATH_FORMAT_HELP,
       description =
-          "The node's private key file (default: a file named \"key\" in the Besu data directory)")
+          "The node's private key file (default: a file named \"key\" in the Besu data directory,"
+              + " for an elliptic-curve node key only; a hybrid or post-quantum --node-dsa needs"
+              + " this option, as such keys are not generated automatically)")
   private final File nodePrivateKeyFile = null;
 
   /**

@@ -149,8 +149,8 @@ Result: {"jsonrpc":"2.0","id":1,"result":"0x9f1c...e27a"}
 Back in the first terminal, within one block period (2 s) the block counter shows a block with **1 tx**:
 
 ```text
-node-3  | ... | INFO  | QbftBesuControllerBuilder | Produced block #42 / 1 tx / 0 pending / 21,000 (0.0%) gas / (0x8d07...)
-node-1  | ... | INFO  | QbftBesuControllerBuilder | Imported block #42 / 1 tx / 0 pending / 21,000 (0.0%) gas / (0x8d07...)
+node-3  | ... | INFO  | QbftBesuControllerBuilder | Produced block #42 / 1 tx / 0 pending / 86,102 (0.0%) gas / (0x8d07...)
+node-1  | ... | INFO  | QbftBesuControllerBuilder | Imported block #42 / 1 tx / 0 pending / 86,102 (0.0%) gas / (0x8d07...)
 ```
 
 Besu does not log transactions at `INFO` level when they enter the transaction pool. The `1 tx` block is the signal
