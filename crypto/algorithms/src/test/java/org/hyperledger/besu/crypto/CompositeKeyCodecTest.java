@@ -121,6 +121,26 @@ class CompositeKeyCodecTest {
         .isInstanceOf(IllegalArgumentException.class);
   }
 
+  @Test
+  void aPrivateKeyOfTheWrongSizeIsRejectedWithItsExpectedLength() {
+    // A classical 32-byte key given to a hybrid node used to fail with "index is out of bounds".
+    final byte[] classicalOnly = new byte[DSAParametersSet.SECP256K1.getPrivateKeyLength()];
+
+    assertThatThrownBy(
+            () ->
+                KeyFactory.createPrivateKey(
+                    Bytes.wrap(classicalOnly),
+                    HYBRID,
+                    PrivateKeyRepresentation.EXPANDED,
+                    PrivateKeyRepresentation.EXPANDED))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining(
+            "SECP256K1-MLDSA44 private key must be "
+                + HYBRID.getPrivateKeyLength()
+                + " bytes, got "
+                + classicalOnly.length);
+  }
+
   /** Decodes a private key the same way the node does when it reads its key file. */
   private static PrivateKey decodePrivateKey(final CompositePrivateKey key) {
     return KeyFactory.createPrivateKey(
