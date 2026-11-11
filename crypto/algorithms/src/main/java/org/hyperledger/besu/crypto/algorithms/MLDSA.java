@@ -46,6 +46,13 @@ public class MLDSA implements DigitalSignatureAlgorithm{
         this.selectedBCParameter = RENAMING_TO_LIB.get(mldsaParameters.getName());
     }
 
+    /**
+     * Signs the data. A failure inside BouncyCastle's signer is rethrown as an {@link
+     * IllegalStateException} that carries it as the cause: logging it and going on left the
+     * signature null, so the caller failed with a NullPointerException that hid the real error.
+     *
+     * @throws IllegalStateException if BouncyCastle cannot produce the signature
+     */
     @Override
     public Signature sign(final Bytes data, final PrivateKey sk) {
         MLDSAPrivateKeyParameters skParams = new MLDSAPrivateKeyParameters(selectedBCParameter, sk.getEncoded());
@@ -56,11 +63,11 @@ public class MLDSA implements DigitalSignatureAlgorithm{
         signer.init(true, skParams);
         signer.update(data.toArrayUnsafe(), 0, data.size());
 
-        byte[] signature = null;
+        final byte[] signature;
         try {
             signature = signer.generateSignature();
         } catch (DataLengthException | CryptoException e) {
-            LOG.error("Error while signing MLDSA", e);
+            throw new IllegalStateException(mldsaParameters.getName() + " signing failed", e);
         }
         return SignatureFactory.createSignatureFromBytes(Bytes.wrap(signature), mldsaParameters);
     }
